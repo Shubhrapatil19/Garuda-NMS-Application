@@ -1,0 +1,46 @@
+spring.application.name=nms
+server.port=8080
+
+# PostgreSQL Database Connection (Dummy placeholders)
+spring.datasource.url=jdbc:postgresql://localhost:5432/garuda_nms_db
+spring.datasource.username=postgres
+spring.datasource.password=YOUR_POSTGRES_PASSWORD
+
+# JPA & Hibernate Settings
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# JWT Security Token Configuration
+garuda.security.jwt.secret=YOUR_256_BIT_SECRET_KEY
+garuda.security.jwt.expiration-ms=86400000
+garuda.security.jwt.remember-me-expiration-ms=604800000
+
+# Swagger OpenAPI Documentation Path
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+
+# Gmail SMTP Mail Sender Configuration (Placeholders)
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=YOUR_GMAIL_ADDRESS
+spring.mail.password=YOUR_GMAIL_APP_PASSWORD
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+
+# OAuth2 Social Login Configuration (Placeholders)
+garuda.oauth.github.client-id=YOUR_GITHUB_CLIENT_ID
+garuda.oauth.github.client-secret=YOUR_GITHUB_CLIENT_SECRET
+
+garuda.oauth.google.client-id=YOUR_GOOGLE_CLIENT_ID
+garuda.oauth.google.client-secret=YOUR_GOOGLE_CLIENT_SECRET
+
+# Server Reverse Proxy
+server.forward-headers-strategy=framework
+
+# Device Onboarding & Polling
+garuda.device.connection-test.timeout-ms=2500
+garuda.device.default-polling-interval-sec=60
+garuda.device.max-retries=3
