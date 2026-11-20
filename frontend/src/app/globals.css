@@ -1,0 +1,348 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom smooth scrollbar for dashboard viewport */
+.dashboard-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.dashboard-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard-viewport::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dashboard-viewport::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+}
+
+.dashboard-viewport::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Prevent unwanted white outline or glow on mouse clicks for buttons */
+button:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CHROME & WEBKIT AUTOFILL DARK THEME OVERRIDE
+   Prevents browser autofill from rendering white/light blue rectangle in dark mode
+   ════════════════════════════════════════════════════════════════ */
+html.dark, html.dark body, html.dark input, html.dark textarea, html.dark select {
+  color-scheme: dark !important;
+}
+
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover, 
+html.dark input:-webkit-autofill:focus, 
+html.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #091528 inset !important;
+  box-shadow: 0 0 0 1000px #091528 inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  caret-color: #f1f5f9 !important;
+  transition: background-color 50000s ease-in-out 0s !important;
+}
+
+html.dark input:autofill,
+html.dark input:autofill:hover, 
+html.dark input:autofill:focus, 
+html.dark input:autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #091528 inset !important;
+  box-shadow: 0 0 0 1000px #091528 inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  caret-color: #f1f5f9 !important;
+  transition: background-color 50000s ease-in-out 0s !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HERO REVEAL ANIMATIONS (SMOOTH STAGGERED CINEMATIC ENTRANCE)
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes heroRevealUp {
+  0% {
+    opacity: 0;
+    transform: translateY(26px);
+    filter: blur(4px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes heroRevealFade {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroLineExpand {
+  0% {
+    width: 0px;
+    opacity: 0;
+  }
+
+  100% {
+    width: 24px;
+    opacity: 1;
+  }
+}
+
+@keyframes heroMapReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(12px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-hero-header {
+  animation: heroRevealFade 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 100ms;
+}
+
+.animate-hero-tagline {
+  animation: heroRevealFade 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 220ms;
+}
+
+.animate-hero-line {
+  animation: heroLineExpand 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 240ms;
+}
+
+.animate-hero-title-1 {
+  animation: heroRevealUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 320ms;
+}
+
+.animate-hero-title-2 {
+  animation: heroRevealUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 440ms;
+}
+
+.animate-hero-desc {
+  animation: heroRevealFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 560ms;
+}
+
+.animate-hero-map {
+  animation: heroMapReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 680ms;
+}
+
+.animate-hero-footer {
+  animation: heroRevealFade 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 800ms;
+}
+
+@keyframes processDrawBeam {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0.1;
+  }
+
+  25% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.7;
+  }
+}
+
+@keyframes maskLineDraw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GARUDA TELEMETRY & NETWORK LOADERS KEYFRAMES
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbitReverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes networkPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes pingOnce {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  75%, 100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-orbit {
+  animation: orbit 4s linear infinite;
+}
+
+.animate-orbit-reverse {
+  animation: orbitReverse 6s linear infinite;
+}
+
+.animate-network-pulse {
+  animation: networkPulse 2s ease-in-out infinite;
+}
+
+.animate-ping-once {
+  animation: pingOnce 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.shadow-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   WIZARD SLIDE TRANSITION ANIMATIONS (Smooth Slide & Fade)
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes wizardSlideForward {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes wizardSlideBackward {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-wizard-slide-forward {
+  animation: wizardSlideForward 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-wizard-slide-backward {
+  animation: wizardSlideBackward 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TAB VIEW SWITCH ANIMATION (Smooth Fade & Subtle Rise)
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes tabSwitchFade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-switch {
+  animation: tabSwitchFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+

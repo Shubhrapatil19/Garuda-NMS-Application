@@ -1,0 +1,505 @@
+{
+  "users": [
+    {
+      "id": "usr-admin",
+      "username": "admin@garuda.io",
+      "password": "password123",
+      "name": "System Administrator",
+      "initials": "SA",
+      "role": "Administrator",
+      "organization": "Garuda Enterprise HQ",
+      "status": "online"
+    },
+    {
+      "id": "usr-2",
+      "username": "jnikumbh69@gmail.com",
+      "password": "password123",
+      "name": "Jayesh Nikumbh",
+      "initials": "JN",
+      "role": "Network Engineer",
+      "organization": "Acme Networks — APAC Operations",
+      "status": "online"
+    },
+    {
+      "id": "usr-1",
+      "username": "alex.morgan@garuda.io",
+      "password": "password123",
+      "name": "Alex Morgan",
+      "initials": "AM",
+      "role": "Network Engineer",
+      "organization": "Acme Networks — APAC Operations",
+      "status": "online"
+    },
+    {
+      "id": "usr-3",
+      "username": "jnikumbh69@revdau.ai",
+      "password": "password123",
+      "name": "Jayesh Nikumbh",
+      "initials": "JN",
+      "role": "NOC Lead Engineer",
+      "organization": "Revdau — AI Operations",
+      "status": "online"
+    },
+    {
+      "id": "usr-4",
+      "username": "alex.morgan@revdau.ai",
+      "password": "password123",
+      "name": "Alex Morgan",
+      "initials": "AM",
+      "role": "NOC Operations Specialist",
+      "organization": "Revdau — AI Operations",
+      "status": "online"
+    }
+  ],
+  "login": [
+    {
+      "id": "1",
+      "status": "authenticated",
+      "message": "Login service ready"
+    },
+    {
+      "username": "alex.morgan@garuda.io",
+      "password": "password123",
+      "id": "tVJc4Ch65aI"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "password": "password123",
+      "organization": "Acme Networks — APAC Operations",
+      "timestamp": "2026-10-26T17:38:15.773Z",
+      "id": "Qx5BuwSFRPE"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "password": "sdf",
+      "organization": "Acme Networks — APAC Operations",
+      "timestamp": "2026-10-26T17:43:41.888Z",
+      "id": "ITb3vhvsGOI"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "password": "password123",
+      "organization": "Acme Networks — APAC Operations",
+      "timestamp": "2026-10-26T17:45:47.897Z",
+      "id": "A9tkAlQbVfY"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "password": "password123",
+      "organization": "Acme Networks — APAC Operations",
+      "timestamp": "2026-10-26T17:46:26.183Z",
+      "id": "20PUz8YHhTs"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "password": "password123",
+      "organization": "Acme Networks — APAC Operations",
+      "timestamp": "2026-10-26T17:48:23.135Z",
+      "id": "5yRgHNnYB78"
+    }
+  ],
+  "logout": [
+    {
+      "id": "1",
+      "status": "success",
+      "message": "Logged out successfully"
+    },
+    {
+      "username": "alex.morgan@garuda.io",
+      "id": "uKZ1EyHBdF0"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "timestamp": "2026-10-26T17:38:24.343Z",
+      "id": "NMerd4SLizk"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "timestamp": "2026-10-26T17:46:16.238Z",
+      "id": "SBokXjqg94w"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "timestamp": "2026-10-26T17:48:08.164Z",
+      "id": "MgPkch0JZD0"
+    },
+    {
+      "username": "jnikumbh69@gmail.com",
+      "timestamp": "2026-10-26T17:52:04.528Z",
+      "id": "Vmpy5gmwlQE"
+    }
+  ],
+  "dashboard": {
+    "engineStatus": {
+      "name": "Olio Poller Engine",
+      "status": "Online",
+      "lastPoll": "Just now",
+      "monitoredNodes": 248
+    },
+    "overview": {
+      "totalDevices": {
+        "count": 248,
+        "change": "+4 this week",
+        "linkText": "Manage inventory"
+      },
+      "onlineDevices": {
+        "count": 231,
+        "healthyRate": "93.1% healthy",
+        "icmpReachable": true,
+        "coreStatus": "All Core Up"
+      },
+      "offlineDevices": {
+        "count": 17,
+        "recovered": "-2 recovered",
+        "circuitStatus": "Unreachable circuits",
+        "triageStatus": "Triage active"
+      },
+      "activeAlerts": {
+        "count": 23,
+        "changeVsLastHr": "-4% vs last hr",
+        "linkText": "View triage center"
+      }
+    },
+    "deviceHealth": {
+      "total": 248,
+      "breakdown": [
+        {
+          "label": "Online",
+          "count": 231,
+          "percentage": 88.5,
+          "color": "#10b981"
+        },
+        {
+          "label": "Warning",
+          "count": 9,
+          "percentage": 3.5,
+          "color": "#f59e0b"
+        },
+        {
+          "label": "Offline",
+          "count": 17,
+          "percentage": 6.5,
+          "color": "#ef4444"
+        },
+        {
+          "label": "Maintenance",
+          "count": 4,
+          "percentage": 1.5,
+          "color": "#64748b"
+        }
+      ]
+    },
+    "dataPollingHealth": {
+      "pollingRequests": "1.24M",
+      "successful": "1.21M",
+      "failed": "30.2K",
+      "averageLatency": "184 ms",
+      "trend": [
+        {
+          "time": "00:00",
+          "latency": 162
+        },
+        {
+          "time": "03:00",
+          "latency": 184
+        },
+        {
+          "time": "06:00",
+          "latency": 145
+        },
+        {
+          "time": "08:30",
+          "latency": 98
+        },
+        {
+          "time": "10:30",
+          "latency": 132
+        },
+        {
+          "time": "12:00",
+          "latency": 156
+        },
+        {
+          "time": "14:30",
+          "latency": 178
+        },
+        {
+          "time": "16:30",
+          "latency": 142
+        },
+        {
+          "time": "19:00",
+          "latency": 194
+        },
+        {
+          "time": "22:00",
+          "latency": 175
+        }
+      ]
+    },
+    "recentAlerts": [
+      {
+        "id": "alt-1",
+        "severity": "critical",
+        "device": "Core-Router-03",
+        "message": "Device Offline",
+        "timestamp": "2 min ago"
+      },
+      {
+        "id": "alt-2",
+        "severity": "warning",
+        "device": "Firewall-01",
+        "message": "High CPU utilization",
+        "timestamp": "5 min ago"
+      },
+      {
+        "id": "alt-3",
+        "severity": "warning",
+        "device": "Switch-14",
+        "message": "Polling failure",
+        "timestamp": "12 min ago"
+      },
+      {
+        "id": "alt-4",
+        "severity": "info",
+        "device": "Router-22",
+        "message": "Device onboarded",
+        "timestamp": "24 min ago"
+      }
+    ],
+    "dataCollectionMethods": {
+      "activePipelines": 5,
+      "totalMonitored": 248,
+      "footerNote": "High-speed 64-bit IF-MIB counters enabled",
+      "methods": [
+        {
+          "id": "snmp",
+          "name": "SNMP",
+          "devices": "126 Devices",
+          "successRate": "99.2%"
+        },
+        {
+          "id": "api",
+          "name": "API",
+          "devices": "54 Devices",
+          "successRate": "98.8%"
+        },
+        {
+          "id": "syslog",
+          "name": "SYSLOG",
+          "devices": "32 Devices",
+          "successRate": "99.8%"
+        },
+        {
+          "id": "push",
+          "name": "PUSH",
+          "devices": "21 Devices",
+          "successRate": "97.9%"
+        },
+        {
+          "id": "pull",
+          "name": "PULL",
+          "devices": "15 Devices",
+          "successRate": "96.7%"
+        }
+      ]
+    }
+  },
+  "devices": [
+    {
+      "id": "dev-01",
+      "name": "Core-Router-01",
+      "hostname": "cr01.blr.garuda.io",
+      "ip": "10.24.1.1",
+      "port": 161,
+      "vendor": "Cisco",
+      "model": "ASR 9010",
+      "type": "Core Router",
+      "site": "Bengaluru Hub",
+      "status": "online",
+      "protocol": "SNMP v3",
+      "uptime": "99.98%",
+      "latency": "12 ms",
+      "lastSeen": "Just now",
+      "serialNumber": "FOC2419L23X"
+    },
+    {
+      "id": "dev-02",
+      "name": "Core-Router-02",
+      "hostname": "cr02.bom.garuda.io",
+      "ip": "10.24.2.1",
+      "port": 161,
+      "vendor": "Juniper",
+      "model": "MX960",
+      "type": "Core Router",
+      "site": "Mumbai DC",
+      "status": "online",
+      "protocol": "gNMI",
+      "uptime": "99.95%",
+      "latency": "16 ms",
+      "lastSeen": "Just now",
+      "serialNumber": "JN1188392AF"
+    },
+    {
+      "id": "dev-03",
+      "name": "Core-Router-03",
+      "hostname": "cr03.del.garuda.io",
+      "ip": "10.24.3.1",
+      "port": 161,
+      "vendor": "Cisco",
+      "model": "ASR 9904",
+      "type": "Core Router",
+      "site": "Delhi PoP",
+      "status": "offline",
+      "protocol": "SNMP v3",
+      "uptime": "94.20%",
+      "latency": "--",
+      "lastSeen": "2 min ago",
+      "serialNumber": "FOC2441M11B"
+    },
+    {
+      "id": "dev-04",
+      "name": "Firewall-01",
+      "hostname": "fw01.blr.garuda.io",
+      "ip": "10.24.1.254",
+      "port": 443,
+      "vendor": "Fortinet",
+      "model": "FortiGate 600E",
+      "type": "Firewall",
+      "site": "Bengaluru Hub",
+      "status": "warning",
+      "protocol": "API",
+      "uptime": "98.70%",
+      "latency": "28 ms",
+      "lastSeen": "5 min ago",
+      "serialNumber": "FG600ETK190"
+    },
+    {
+      "id": "dev-05",
+      "name": "Switch-14",
+      "hostname": "sw14.maa.garuda.io",
+      "ip": "10.24.4.14",
+      "port": 161,
+      "vendor": "Arista",
+      "model": "7280R3",
+      "type": "L3 Switch",
+      "site": "Chennai Edge",
+      "status": "warning",
+      "protocol": "SNMP v2c",
+      "uptime": "97.40%",
+      "latency": "42 ms",
+      "lastSeen": "12 min ago",
+      "serialNumber": "SSB20491029"
+    },
+    {
+      "id": "dev-06",
+      "name": "Router-22",
+      "hostname": "rt22.sin.garuda.io",
+      "ip": "10.24.5.22",
+      "port": 161,
+      "vendor": "Cisco",
+      "model": "Catalyst 8300",
+      "type": "Edge Router",
+      "site": "Singapore DC",
+      "status": "online",
+      "protocol": "Syslog",
+      "uptime": "100.0%",
+      "latency": "38 ms",
+      "lastSeen": "Just now",
+      "serialNumber": "FOC2601K44E"
+    },
+    {
+      "id": "dev-07",
+      "name": "CPE-Gateway-08",
+      "hostname": "cpe08.jkt.garuda.io",
+      "ip": "10.24.6.8",
+      "port": 8728,
+      "vendor": "MikroTik",
+      "model": "CCR2004-16G",
+      "type": "CPE Gateway",
+      "site": "Jakarta Hub",
+      "status": "online",
+      "protocol": "API",
+      "uptime": "99.91%",
+      "latency": "45 ms",
+      "lastSeen": "Just now",
+      "serialNumber": "HE908721BC4"
+    },
+    {
+      "id": "dev-08",
+      "name": "Edge-Switch-02",
+      "hostname": "esw02.dxb.garuda.io",
+      "ip": "10.24.7.2",
+      "port": 161,
+      "vendor": "Cisco",
+      "model": "Catalyst 9300",
+      "type": "Access Switch",
+      "site": "Dubai Hub",
+      "status": "maintenance",
+      "protocol": "SNMP v3",
+      "uptime": "96.50%",
+      "latency": "--",
+      "lastSeen": "1 hr ago",
+      "serialNumber": "FOC2219J78A"
+    }
+  ],
+  "organizations": [
+    {
+      "id": "org-1",
+      "name": "Acme Networks",
+      "label": "Acme Networks — APAC Operations",
+      "domain": "acme.io",
+      "region": "APAC",
+      "status": "active"
+    },
+    {
+      "id": "org-2",
+      "name": "Revdau",
+      "label": "Revdau — AI Operations",
+      "domain": "revdau.ai",
+      "region": "Global",
+      "status": "active"
+    },
+    {
+      "id": "org-3",
+      "name": "Garuda NMS",
+      "label": "Garuda NMS — Internal Ops",
+      "domain": "garuda.io",
+      "region": "APAC",
+      "status": "active"
+    },
+    {
+      "id": "org-4",
+      "name": "Nexora Telecom",
+      "label": "Nexora Telecom — MEA Division",
+      "domain": "nexora.net",
+      "region": "MEA",
+      "status": "active"
+    },
+    {
+      "id": "org-5",
+      "name": "CloudVault Systems",
+      "label": "CloudVault Systems — EU Infra",
+      "domain": "cloudvault.eu",
+      "region": "EU",
+      "status": "active"
+    },
+    {
+      "id": "org-6",
+      "name": "Infrabeat",
+      "label": "Infrabeat — DevOps Platform",
+      "domain": "infrabeat.dev",
+      "region": "US",
+      "status": "active"
+    },
+    {
+      "id": "org-7",
+      "name": "Zettaflow Networks",
+      "label": "Zettaflow Networks — LATAM Ops",
+      "domain": "zettaflow.com",
+      "region": "LATAM",
+      "status": "active"
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
