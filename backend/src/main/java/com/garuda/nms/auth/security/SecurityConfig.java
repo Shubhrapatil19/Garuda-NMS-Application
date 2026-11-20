@@ -32,7 +32,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Bina token aane par blank page ki jagah JSON error message bhejo
+
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setContentType("application/json");
@@ -47,15 +47,18 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Password change ke liye token zaroori hai
+
                         .requestMatchers("/api/v1/auth/change-password").authenticated()
 
-                        // 2. Public Endpoints
+
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll()
 
-                        // 3. Device Module APIs
+
+
                         .requestMatchers("/api/v1/devices/**").authenticated()
+
+                        .requestMatchers("/api/v1/alerts/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
