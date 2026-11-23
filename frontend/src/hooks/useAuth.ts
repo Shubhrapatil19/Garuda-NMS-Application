@@ -1,55 +1,67 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useSyncExternalStore, useCallback } from "react";
 import {
   authService,
   UserSession,
-  RolePermissions,
   UserRole,
 } from "@/services/authService";
 
+let cachedUser: UserSession | null = null;
+let cachedRawValue: string | null = null;
+
+function subscribeAuth(callback: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+  window.addEventListener("garuda-auth-change", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener("garuda-auth-change", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function getAuthSnapshot(): UserSession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = localStorage.getItem("garuda_auth_user");
+    if (raw === cachedRawValue) {
+      return cachedUser;
+    }
+    cachedRawValue = raw;
+    cachedUser = raw ? (JSON.parse(raw) as UserSession) : null;
+    return cachedUser;
+  } catch {
+    cachedRawValue = null;
+    cachedUser = null;
+    return null;
+  }
+}
+
+function getAuthServerSnapshot(): UserSession | null {
+  return null;
+}
+
 export function useAuth() {
-  const [user, setUser] = useState<UserSession | null>(null);
-  const [permissions, setPermissions] = useState<RolePermissions>(() =>
-    authService.getPermissions(null)
+  const user = useSyncExternalStore(
+    subscribeAuth,
+    getAuthSnapshot,
+    getAuthServerSnapshot
   );
 
-  const refreshAuth = useCallback(() => {
-    const current = authService.getCurrentUser() ?? authService.getDefaultUser();
-    setUser(current);
-    setPermissions(authService.getPermissions(current));
-  }, []);
-
-  useEffect(() => {
-    refreshAuth();
-
-    const handleAuthChange = (e: Event) => {
-      const customEvent = e as CustomEvent<UserSession>;
-      if (customEvent.detail) {
-        setUser(customEvent.detail);
-        setPermissions(authService.getPermissions(customEvent.detail));
-      } else {
-        refreshAuth();
-      }
-    };
-
-    window.addEventListener("garuda-auth-change", handleAuthChange);
-    window.addEventListener("storage", refreshAuth);
-    return () => {
-      window.removeEventListener("garuda-auth-change", handleAuthChange);
-      window.removeEventListener("storage", refreshAuth);
-    };
-  }, [refreshAuth]);
+  const permissions = authService.getPermissions(user);
 
   const switchRole = useCallback((role: UserRole) => {
-    const updated = authService.switchRole(role);
-    setUser(updated);
-    setPermissions(authService.getPermissions(updated));
-    return updated;
+    return authService.switchRole(role);
   }, []);
 
   return {
     user,
+    isAuthenticated: Boolean(user),
+    loading: false,
     permissions,
     isAdmin: permissions.isAdmin,
     switchRole,

@@ -69,7 +69,7 @@ export interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar: React.FC<Readonly<SidebarProps>> = ({
   activeTab = "dashboard",
   onSelectTab,
   isCollapsed = false,
@@ -193,13 +193,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Mobile Backdrop Overlay (< lg only) */}
-      <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300 ${
-          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-        onClick={onCloseMobile}
-        aria-hidden="true"
-      />
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close mobile navigation sidebar"
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300 border-0 p-0"
+          onClick={onCloseMobile}
+        />
+      )}
 
       <aside
         className={`fixed inset-y-0 left-0 z-50 lg:static lg:h-screen lg:top-0 bg-white dark:bg-[#081426] border-r border-slate-200 dark:border-[#12233b] transition-all duration-300 ease-in-out flex flex-col justify-between select-none shrink-0 shadow-2xl lg:shadow-xl ${
@@ -215,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="hidden lg:flex absolute -right-3 top-[22px] w-6 h-6 rounded-full bg-white dark:bg-[#0a1830] border border-slate-200 dark:border-[#1b3256] shadow-md items-center justify-center text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all duration-200 z-50 cursor-pointer focus:outline-none group"
+            className="hidden lg:flex absolute -right-3 top-5.5 w-6 h-6 rounded-full bg-white dark:bg-[#0a1830] border border-slate-200 dark:border-[#1b3256] shadow-md items-center justify-center text-slate-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all duration-200 z-50 cursor-pointer focus:outline-none group"
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -231,14 +233,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Top Header: GarudaLogo & Mobile Close Button */}
           <div
-            className={`h-[68px] shrink-0 flex items-center justify-between border-b border-slate-200/80 dark:border-[#14233a] transition-all duration-300 ${
+            className={`h-17 shrink-0 flex items-center justify-between border-b border-slate-200/80 dark:border-[#14233a] transition-all duration-300 ${
               collapsed ? "lg:justify-center px-4 lg:px-0" : "px-4"
             }`}
           >
             {/* Logo Brand Area */}
-            <div
-              className={`flex items-center overflow-hidden ${
-                collapsed ? "cursor-pointer lg:justify-center" : ""
+            <button
+              type="button"
+              className={`flex items-center overflow-hidden bg-transparent border-0 p-0 text-left cursor-pointer ${
+                collapsed ? "lg:justify-center" : ""
               }`}
               onClick={() => {
                 if (collapsed && onToggleCollapse) {
@@ -256,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 showText={!collapsed}
                 showSubtitle={!collapsed}
               />
-            </div>
+            </button>
 
             {/* Mobile Close Button (< lg only) */}
             {onCloseMobile && (
@@ -343,7 +346,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`text-[15px] tracking-tight truncate whitespace-nowrap transition-all duration-300 ${
                       collapsed
                         ? "max-w-0 opacity-0 -translate-x-2 pointer-events-none"
-                        : "max-w-[160px] opacity-100 translate-x-0"
+                        : "max-w-40 opacity-100 translate-x-0"
                     } ${
                       isActive
                         ? "text-blue-700 dark:text-white font-semibold"
@@ -375,8 +378,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Footer: Avatar & User Profile */}
       <div className="p-3 border-t border-slate-200 dark:border-[#12233b] bg-slate-50 dark:bg-[#071120]">
         <div
-          onClick={() => collapsed && onToggleCollapse && onToggleCollapse()}
-          className={`flex items-center rounded-xl p-2 transition-colors hover:bg-slate-100 dark:hover:bg-[#0c1e38]/70 cursor-pointer group ${
+          className={`flex items-center rounded-xl p-2 transition-colors hover:bg-slate-100 dark:hover:bg-[#0c1e38]/70 group ${
             collapsed ? "justify-center px-0" : "justify-between"
           }`}
           title={
@@ -410,7 +412,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`flex flex-col leading-tight min-w-0 transition-all duration-300 overflow-hidden ${
                 collapsed
                   ? "max-w-0 opacity-0 -translate-x-2 pointer-events-none"
-                  : "max-w-[140px] opacity-100 translate-x-0"
+                  : "max-w-35 opacity-100 translate-x-0"
               }`}
             >
               <span className="font-bold text-[14px] text-slate-800 dark:text-white truncate">
@@ -442,7 +444,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-all duration-300 cursor-pointer shrink-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 ${
                 collapsed
                   ? "max-w-0 opacity-0 p-0 pointer-events-none overflow-hidden"
-                  : "max-w-[32px] opacity-100"
+                  : "max-w-8 opacity-100"
               }`}
               title="Sign out"
             >

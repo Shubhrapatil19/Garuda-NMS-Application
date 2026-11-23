@@ -11,8 +11,6 @@ import {
   Cpu,
   Server,
   Wifi,
-  Radio,
-  Maximize2,
 } from "lucide-react";
 import { CarrierSite } from "@/data/sitesData";
 
@@ -814,7 +812,7 @@ export const Topology3DCanvas: React.FC<Topology3DCanvasProps> = ({ site }) => {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
-        className={`relative w-full h-[360px] sm:h-[400px] flex items-center justify-center select-none overflow-hidden ${
+        className={`relative w-full h-90 sm:h-100 flex items-center justify-center select-none overflow-hidden ${
           !is2DFallback
             ? hoveredNode
               ? "cursor-pointer"
@@ -874,7 +872,7 @@ export const Topology3DCanvas: React.FC<Topology3DCanvasProps> = ({ site }) => {
                       <Activity size={12} className="text-blue-400" />
                       Role:
                     </span>
-                    <span className="font-medium text-slate-200 truncate max-w-[120px]">
+                    <span className="font-medium text-slate-200 truncate max-w-30">
                       {hoveredNode.role}
                     </span>
                   </div>
@@ -885,7 +883,7 @@ export const Topology3DCanvas: React.FC<Topology3DCanvasProps> = ({ site }) => {
                         <Cpu size={12} className="text-purple-400" />
                         Model:
                       </span>
-                      <span className="font-mono text-slate-200 truncate max-w-[120px]">
+                      <span className="font-mono text-slate-200 truncate max-w-30">
                         {hoveredNode.model}
                       </span>
                     </div>

@@ -9,13 +9,13 @@ export interface LogoutConfirmModalProps {
   onConfirm: () => Promise<void> | void;
 }
 
-export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
+export const LogoutConfirmModal: React.FC<Readonly<LogoutConfirmModalProps>> = ({
   isOpen,
   onClose,
   onConfirm,
 }) => {
-  const [isRendered, setIsRendered] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isRendered, setIsRendered] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(isOpen);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Smooth enter and exit animation lifecycle
@@ -23,24 +23,21 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
     let timer: NodeJS.Timeout;
 
     if (isOpen) {
-      setIsRendered(true);
       timer = setTimeout(() => {
+        setIsRendered(true);
         setIsVisible(true);
-      }, 20);
-    } else if (isRendered) {
-      setIsVisible(false);
-      timer = setTimeout(() => {  
+      }, 0);
+    } else {
+      timer = setTimeout(() => {
+        setIsVisible(false);
         setIsRendered(false);
       }, 240);
-    } else {
-      setIsVisible(false);
-      setIsRendered(false);
     }
 
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [isOpen, isRendered]);
+  }, [isOpen]);
 
   const handleClose = useCallback(() => {
     if (isLoggingOut) return;
@@ -77,23 +74,24 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
 
   return (
     <div
-      role="dialog"
       aria-modal="true"
       aria-labelledby="logout-dialog-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none"
     >
       {/* Backdrop with smooth blur and fade */}
-      <div
+      <button
+        type="button"
+        aria-label="Close logout modal backdrop"
+        tabIndex={-1}
         onClick={handleClose}
-        className={`fixed inset-0 bg-slate-900/50 dark:bg-[#020611]/75 transition-all duration-240 ease-out cursor-pointer ${
+        className={`fixed inset-0 bg-slate-900/50 dark:bg-[#020611]/75 transition-all duration-240 ease-out cursor-pointer border-0 p-0 ${
           isVisible ? "opacity-100 backdrop-blur-xs" : "opacity-0 backdrop-blur-none"
         }`}
       />
 
       {/* Spacious, Premium Modal Card (White in light theme, dark in dark theme) */}
       <div
-        onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-[480px] rounded-3xl bg-white dark:bg-[#081426] border border-slate-200/90 dark:border-[#1a2e4d] shadow-2xl dark:shadow-[0_25px_70px_-10px_rgba(0,0,0,0.85),0_0_40px_rgba(244,63,94,0.08)] p-6 sm:p-8 text-slate-800 dark:text-slate-200 z-10 transition-all duration-240 ease-out transform ${
+        className={`relative w-full max-w-120 rounded-3xl bg-white dark:bg-[#081426] border border-slate-200/90 dark:border-[#1a2e4d] shadow-2xl dark:shadow-[0_25px_70px_-10px_rgba(0,0,0,0.85),0_0_40px_rgba(244,63,94,0.08)] p-6 sm:p-8 text-slate-800 dark:text-slate-200 z-10 transition-all duration-240 ease-out transform ${
           isVisible
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-95 translate-y-3"

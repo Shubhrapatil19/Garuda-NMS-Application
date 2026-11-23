@@ -119,7 +119,7 @@ export default function NetworkTopologyMap() {
   }, []);
 
   return (
-    <div className="relative w-full h-[280px] sm:h-[320px] lg:h-[300px] xl:h-[360px] 2xl:h-[400px] overflow-hidden">
+    <div className="relative w-full h-70 sm:h-80 lg:h-75 xl:h-90 2xl:h-100 overflow-hidden">
       {/* ── SVG Connectivity Lines: Draws once from outer tree to root, with live data packets ── */}
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"

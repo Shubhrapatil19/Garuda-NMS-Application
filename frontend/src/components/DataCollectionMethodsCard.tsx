@@ -36,7 +36,8 @@ export const DataCollectionMethodsCard: React.FC<DataCollectionMethodsCardProps>
 }) => {
   const [selectedMethodId, setSelectedMethodId] = useState<string>("push");
 
-  const resolvedData = data || ((dbData.dashboard as any).dataCollectionMethods as DataCollectionMethodsData);
+  const dashboardData = (dbData as { dashboard?: { dataCollectionMethods?: DataCollectionMethodsData } }).dashboard;
+  const resolvedData = data || dashboardData?.dataCollectionMethods;
   const methods: MethodItem[] = resolvedData?.methods || defaultMethods;
   const activePipelines = resolvedData?.activePipelines ?? 5;
   const totalMonitored = resolvedData?.totalMonitored ?? 248;
@@ -68,10 +69,11 @@ export const DataCollectionMethodsCard: React.FC<DataCollectionMethodsCardProps>
           {methods.map((method: MethodItem) => {
             const isSelected = selectedMethodId === method.id;
             return (
-              <div
+              <button
+                type="button"
                 key={method.id}
                 onClick={() => setSelectedMethodId(method.id)}
-                className={`rounded-xl p-3.5 sm:p-4 transition-all cursor-pointer flex flex-col justify-between select-none ${
+                className={`rounded-xl p-3.5 sm:p-4 transition-all cursor-pointer flex flex-col justify-between select-none text-left w-full ${
                   isSelected
                     ? "border-2 border-blue-400 dark:border-blue-500 bg-white dark:bg-[#0c182b] shadow-xs ring-2 ring-blue-50 dark:ring-blue-950/40"
                     : "border border-slate-200/80 dark:border-[#162740] bg-white dark:bg-[#091322] hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-2xs"
@@ -94,7 +96,7 @@ export const DataCollectionMethodsCard: React.FC<DataCollectionMethodsCardProps>
                     Success
                   </span>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

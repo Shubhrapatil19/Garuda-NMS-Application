@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { X, Mail, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { toast } from "sonner";
+import { sanitizeApiError } from "@/utils/errorHandler";
 
 export interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -38,7 +39,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
         description: res.message || `Password reset link sent to ${trimmed}.`,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to send reset link.";
+      const msg = sanitizeApiError(
+        err,
+        "Failed to send reset link. Please check your email or try again later."
+      );
       toast.error("Request Failed", { description: msg });
     } finally {
       setIsSubmitting(false);

@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 export interface OrbitLoaderProps {
   compact?: boolean;
@@ -11,7 +12,7 @@ export interface OrbitLoaderProps {
 /**
  * Full-screen or Container Orbit Loader for initial application loading or major view transitions
  */
-export const OrbitLoader: React.FC<OrbitLoaderProps> = ({
+export const OrbitLoader: React.FC<Readonly<OrbitLoaderProps>> = ({
   compact = false,
   text = "Syncing Garuda Telemetry...",
   subtext = "Polling regional collectors & underlay telemetry",
@@ -60,14 +61,13 @@ export const OrbitLoader: React.FC<OrbitLoaderProps> = ({
         </div>
 
         {/* Center Pulse Core */}
-        <div className="relative w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <img
-            src="/garuda-logo.png"
+        <div className="relative w-9 h-9 rounded-full bg-linear-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <Image
+            src="/Logo.png"
             alt="Garuda"
+            width={20}
+            height={20}
             className="w-5 h-5 object-contain brightness-0 invert"
-            onError={(e) => {
-              e.currentTarget.src = "/Logo.png";
-            }}
           />
         </div>
 
@@ -128,7 +128,7 @@ export interface SkeletonChartProps {
 /**
  * Shimmering Skeleton for Chart Cards
  */
-export const SkeletonChart: React.FC<SkeletonChartProps> = ({ className = "" }) => (
+export const SkeletonChart: React.FC<Readonly<SkeletonChartProps>> = ({ className = "" }) => (
   <div
     className={`w-full bg-white rounded-xl border border-slate-200/80 p-5 shadow-card space-y-4 animate-pulse ${className}`}
     role="status"
@@ -162,7 +162,7 @@ export interface SkeletonTableProps {
 /**
  * Shimmering Skeleton for Tables
  */
-export const SkeletonTable: React.FC<SkeletonTableProps> = ({
+export const SkeletonTable: React.FC<Readonly<SkeletonTableProps>> = ({
   rows = 5,
   className = "",
 }) => (
@@ -178,7 +178,7 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
     <div className="space-y-3 pt-2">
       {Array.from({ length: rows }).map((_, i) => (
         <div
-          key={i}
+          key={`skeleton-table-row-${i + 1}`}
           className="flex items-center space-x-4 py-2 border-b border-slate-100 last:border-0"
         >
           <div className="h-4 w-1/5 bg-slate-200 rounded" />
