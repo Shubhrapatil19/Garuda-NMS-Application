@@ -1,6 +1,7 @@
 import { getApiBaseUrl } from "./apiClient";
 import { organizationService, Organization } from "./organizationService";
 import dbData from "../../data/db.json";
+import { sanitizeApiError } from "../utils/errorHandler";
 
 export type UserRole = "Administrator" | "Network Engineer" | "NOC Lead Engineer";
 
@@ -111,6 +112,161 @@ export interface ResetPasswordPayload {
 
 const STORAGE_KEY = "garuda_auth_user";
 
+interface ApiResponseSessionData {
+  token?: string;
+  data?: {
+    token?: string;
+    accessToken?: string;
+    user?: Partial<UserRecord> & { fullName?: string; orgName?: string };
+  };
+  accessToken?: string;
+  user?: Partial<UserRecord> & { fullName?: string; orgName?: string };
+}
+
+function parseAndStoreSession(
+  data: ApiResponseSessionData | null | undefined,
+  fallbackUsername: string,
+  fallbackOrg?: string
+): UserSession {
+  const token =
+    data?.token ||
+    data?.data?.token ||
+    data?.data?.accessToken ||
+    data?.accessToken;
+
+  const rawUser =
+    data?.data?.user ||
+    data?.user ||
+    (data?.data && typeof data.data === "object" && !Array.isArray(data.data) && "username" in data.data
+      ? data.data
+      : {});
+  const apiUser = rawUser as Partial<UserRecord> & { email?: string; fullName?: string; orgName?: string };
+
+  const username = apiUser.username || apiUser.email || fallbackUsername;
+  const fullName = apiUser.name || apiUser.fullName || fallbackUsername.split("@")[0];
+
+  const initials =
+    apiUser.initials ||
+    (fullName
+      ? fullName
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+      : fallbackUsername.slice(0, 2).toUpperCase());
+
+  const session: UserSession = {
+    id: apiUser.id || `usr-${Date.now()}`,
+    username,
+    name: fullName,
+    initials,
+    role: apiUser.role || "NOC Lead Engineer",
+    organization:
+      apiUser.organization ||
+      apiUser.orgName ||
+      fallbackOrg ||
+      "Garuda Enterprise",
+    status: "online",
+    token,
+  };
+
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    if (token) {
+      localStorage.setItem("garuda_auth_token", token);
+    }
+    if (typeof document !== "undefined") {
+      const cookieToken = token || `mock-token-${session.id}`;
+      document.cookie = `garuda_auth_token=${cookieToken}; path=/; max-age=604800; SameSite=Lax`;
+    }
+    window.dispatchEvent(
+      new CustomEvent("garuda-auth-change", { detail: session })
+    );
+  }
+
+  return session;
+}
+
+async function loginWithPassword(credentials: LoginCredentials): Promise<UserSession> {
+  const targetUsername = credentials.username.trim();
+  const baseUrl = getApiBaseUrl();
+  const endpoint = `${baseUrl}/api/v1/auth/signin/password`;
+  const body = {
+    organizationId: credentials.organizationId,
+    usernameOrEmail: targetUsername,
+    password: credentials.password,
+    rememberMe: credentials.rememberMe ?? true,
+  };
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, */*",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || data?.success === false) {
+      const rawErrorMsg =
+        data?.message ||
+        (data?.data && typeof data.data === "object" ? Object.values(data.data).join(", ") : null) ||
+        "Invalid organization, username/email, or password.";
+      throw new Error(sanitizeApiError(rawErrorMsg, "Invalid organization, username/email, or password."));
+    }
+
+    return parseAndStoreSession(data, targetUsername, credentials.organization);
+  } catch (err: unknown) {
+    if (err instanceof Error) throw err;
+    throw new Error("Authentication failed. Please check your network and credentials.");
+  }
+}
+
+async function loginWithOtp(credentials: LoginCredentials): Promise<UserSession> {
+  const targetUsername = credentials.username.trim();
+  const baseUrl = getApiBaseUrl();
+  const endpoint = `${baseUrl}/api/v1/auth/signin/otp`;
+  const body = {
+    organizationId: credentials.organizationId,
+    usernameOrEmail: targetUsername,
+    oneTimeCode: (credentials.otpCode || "").trim(),
+    rememberMe: credentials.rememberMe ?? false,
+  };
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, */*",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || data?.success === false) {
+      const rawErrorMsg =
+        data?.message ||
+        (data?.data && typeof data.data === "object" ? Object.values(data.data).join(", ") : null) ||
+        "Invalid one-time verification code.";
+      throw new Error(sanitizeApiError(rawErrorMsg, "Invalid one-time verification code."));
+    }
+
+    return parseAndStoreSession(data, targetUsername, credentials.organization);
+  } catch (err: unknown) {
+    if (err instanceof Error) throw err;
+    throw new Error("OTP verification failed. Please check your network and code.");
+  }
+}
+
+let cachedUserSession: UserSession | null = null;
+let cachedRawUserStr: string | null = null;
+
 export const authService = {
   // Return the default user directly from data/db.json (defaults to Jayesh Nikumbh, NOC Lead Engineer)
   getDefaultUser(): UserSession {
@@ -180,6 +336,9 @@ export const authService = {
 
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      if (typeof document !== "undefined") {
+        document.cookie = `garuda_auth_token=mock-token-${session.id}; path=/; max-age=604800; SameSite=Lax`;
+      }
       window.dispatchEvent(
         new CustomEvent("garuda-auth-change", { detail: session })
       );
@@ -190,175 +349,12 @@ export const authService = {
 
   // Handle login by calling backend API endpoints directly (/api/v1/auth/signin/password or /api/v1/auth/signin/otp)
   async login(credentials: LoginCredentials): Promise<UserSession> {
-    const targetUsername = credentials.username.trim();
-    const baseUrl = getApiBaseUrl();
-
-    // 1. Password-based authentication (/api/v1/auth/signin/password)
     if (credentials.password !== undefined) {
-      const endpoint = `${baseUrl}/api/v1/auth/signin/password`;
-      const body = {
-        organizationId: credentials.organizationId,
-        usernameOrEmail: targetUsername,
-        password: credentials.password,
-        rememberMe: credentials.rememberMe !== undefined ? credentials.rememberMe : true,
-      };
-
-      try {
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json, */*",
-          },
-          body: JSON.stringify(body),
-        });
-
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok || (data && data.success === false)) {
-          const errorMsg =
-            data?.message ||
-            (data?.data && typeof data.data === "object" ? Object.values(data.data).join(", ") : null) ||
-            "Invalid organization, username/email, or password.";
-          throw new Error(errorMsg);
-        }
-
-        const token =
-          data?.token ||
-          data?.data?.token ||
-          data?.data?.accessToken ||
-          data?.accessToken;
-
-        const apiUser =
-          data?.data?.user ||
-          (data?.data && typeof data.data === "object" && !Array.isArray(data.data) && "username" in data.data
-            ? data.data
-            : data?.user || {});
-
-        const session: UserSession = {
-          id: apiUser.id || `usr-${Date.now()}`,
-          username: apiUser.username || apiUser.email || targetUsername,
-          name: apiUser.name || apiUser.fullName || targetUsername.split("@")[0],
-          initials:
-            apiUser.initials ||
-            (apiUser.fullName || apiUser.name
-              ? (apiUser.fullName || apiUser.name)
-                  .split(" ")
-                  .map((n: string) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2)
-              : targetUsername.slice(0, 2).toUpperCase()),
-          role: apiUser.role || "NOC Lead Engineer",
-          organization:
-            apiUser.organization ||
-            apiUser.orgName ||
-            credentials.organization ||
-            "Garuda Enterprise",
-          status: "online",
-          token,
-        };
-
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-          if (token) {
-            localStorage.setItem("garuda_auth_token", token);
-          }
-          window.dispatchEvent(
-            new CustomEvent("garuda-auth-change", { detail: session })
-          );
-        }
-
-        return session;
-      } catch (err: unknown) {
-        if (err instanceof Error) throw err;
-        throw new Error("Authentication failed. Please check your network and credentials.");
-      }
+      return loginWithPassword(credentials);
     }
-
-    // 2. OTP-based authentication (/api/v1/auth/signin/otp)
     if (credentials.otpCode !== undefined) {
-      const endpoint = `${baseUrl}/api/v1/auth/signin/otp`;
-      const body = {
-        organizationId: credentials.organizationId,
-        usernameOrEmail: targetUsername,
-        oneTimeCode: credentials.otpCode.trim(),
-        rememberMe: credentials.rememberMe !== undefined ? credentials.rememberMe : false,
-      };
-
-      try {
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json, */*",
-          },
-          body: JSON.stringify(body),
-        });
-
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok || (data && data.success === false)) {
-          const errorMsg =
-            data?.message ||
-            (data?.data && typeof data.data === "object" ? Object.values(data.data).join(", ") : null) ||
-            "Invalid one-time verification code.";
-          throw new Error(errorMsg);
-        }
-
-        const token =
-          data?.token ||
-          data?.data?.token ||
-          data?.data?.accessToken ||
-          data?.accessToken;
-
-        const apiUser =
-          data?.data?.user ||
-          (data?.data && typeof data.data === "object" && !Array.isArray(data.data) && "username" in data.data
-            ? data.data
-            : data?.user || {});
-
-        const session: UserSession = {
-          id: apiUser.id || `usr-${Date.now()}`,
-          username: apiUser.username || apiUser.email || targetUsername,
-          name: apiUser.name || apiUser.fullName || targetUsername.split("@")[0],
-          initials:
-            apiUser.initials ||
-            (apiUser.fullName || apiUser.name
-              ? (apiUser.fullName || apiUser.name)
-                  .split(" ")
-                  .map((n: string) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2)
-              : targetUsername.slice(0, 2).toUpperCase()),
-          role: apiUser.role || "NOC Lead Engineer",
-          organization:
-            apiUser.organization ||
-            apiUser.orgName ||
-            credentials.organization ||
-            "Garuda Enterprise",
-          status: "online",
-          token,
-        };
-
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-          if (token) {
-            localStorage.setItem("garuda_auth_token", token);
-          }
-          window.dispatchEvent(
-            new CustomEvent("garuda-auth-change", { detail: session })
-          );
-        }
-
-        return session;
-      } catch (err: unknown) {
-        if (err instanceof Error) throw err;
-        throw new Error("OTP verification failed. Please check your network and code.");
-      }
+      return loginWithOtp(credentials);
     }
-
     throw new Error("Please provide either password or one-time code to sign in.");
   },
 
@@ -385,11 +381,16 @@ export const authService = {
 
       const responseData = await res.json().catch(() => null);
 
-      if (!res.ok || (responseData && responseData.success === false)) {
-        const errorMsg =
+      if (!res.ok || responseData?.success === false) {
+        const rawErrorMsg =
           responseData?.message ||
           `OAuth sign-in failed with ${payload.provider}. Please verify your account.`;
-        throw new Error(errorMsg);
+        throw new Error(
+          sanitizeApiError(
+            rawErrorMsg,
+            `OAuth sign-in failed with ${payload.provider}. Please verify your account.`
+          )
+        );
       }
 
       const token =
@@ -426,7 +427,7 @@ export const authService = {
       const names = userName.trim().split(/\s+/);
       const initials =
         names.length > 1
-          ? (names[0][0] + names[names.length - 1][0]).toUpperCase()
+          ? (names[0][0] + (names.at(-1)?.[0] ?? "")).toUpperCase()
           : names[0].slice(0, 2).toUpperCase();
 
       const userRole = (tokenClaims?.roles?.[0] || apiUser?.role || "Network Engineer")
@@ -448,6 +449,10 @@ export const authService = {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
         if (token) {
           localStorage.setItem("garuda_auth_token", token);
+        }
+        if (typeof document !== "undefined") {
+          const cookieToken = token || `mock-token-${session.id}`;
+          document.cookie = `garuda_auth_token=${cookieToken}; path=/; max-age=604800; SameSite=Lax`;
         }
         window.dispatchEvent(
           new CustomEvent("garuda-auth-change", { detail: session })
@@ -478,8 +483,13 @@ export const authService = {
 
       const data = await res.json().catch(() => null);
 
-      if (!res.ok || (data && data.success === false)) {
-        throw new Error(data?.message || "Failed to dispatch login verification code.");
+      if (!res.ok || data?.success === false) {
+        throw new Error(
+          sanitizeApiError(
+            data?.message,
+            "Failed to dispatch login verification code."
+          )
+        );
       }
 
       return {
@@ -509,8 +519,13 @@ export const authService = {
 
       const data = await res.json().catch(() => null);
 
-      if (!res.ok || (data && data.success === false)) {
-        throw new Error(data?.message || "Failed to dispatch verification code.");
+      if (!res.ok || data?.success === false) {
+        throw new Error(
+          sanitizeApiError(
+            data?.message,
+            "Failed to dispatch verification code."
+          )
+        );
       }
 
       return {
@@ -532,7 +547,7 @@ export const authService = {
     const names = data.fullName.trim().split(/\s+/);
     const initials =
       names.length > 1
-        ? (names[0][0] + names[names.length - 1][0]).toUpperCase()
+        ? (names[0][0] + (names.at(-1)?.[0] ?? "")).toUpperCase()
         : names[0].slice(0, 2).toUpperCase();
 
     const requestPayload = {
@@ -541,7 +556,7 @@ export const authService = {
       password: data.password,
       confirmPassword: data.confirmPassword || data.password,
       verificationCode: (data.verificationCode || "").trim(),
-      agreeToTerms: data.agreeToTerms !== undefined ? data.agreeToTerms : true,
+      agreeToTerms: data.agreeToTerms ?? true,
     };
 
     try {
@@ -556,11 +571,16 @@ export const authService = {
 
       const responseData = await res.json().catch(() => null);
 
-      if (!res.ok || (responseData && responseData.success === false)) {
-        const errorMsg =
+      if (!res.ok || responseData?.success === false) {
+        const rawErrorMsg =
           responseData?.message ||
           `Registration failed with status ${res.status}. Please check your verification code.`;
-        throw new Error(errorMsg);
+        throw new Error(
+          sanitizeApiError(
+            rawErrorMsg,
+            "Registration failed. Please check your verification code."
+          )
+        );
       }
 
       const token = responseData?.token || responseData?.data?.token;
@@ -596,22 +616,34 @@ export const authService = {
     if (typeof window === "undefined") return null;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return null;
-      return JSON.parse(stored) as UserSession;
+      if (stored === cachedRawUserStr) {
+        return cachedUserSession;
+      }
+      cachedRawUserStr = stored;
+      cachedUserSession = stored ? (JSON.parse(stored) as UserSession) : null;
+      return cachedUserSession;
     } catch {
+      cachedRawUserStr = null;
+      cachedUserSession = null;
       return null;
     }
   },
 
   // Terminate user session locally (no backend logout API call)
-  async logout(): Promise<void> {
+  logout(): Promise<void> {
     if (typeof window !== "undefined") {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem("garuda_auth_token");
+      cachedRawUserStr = null;
+      cachedUserSession = null;
+      if (typeof document !== "undefined") {
+        document.cookie = "garuda_auth_token=; path=/; max-age=0; SameSite=Lax";
+      }
       window.dispatchEvent(
         new CustomEvent("garuda-auth-change", { detail: null })
       );
     }
+    return Promise.resolve();
   },
 
   // Delegate organization retrieval to organizationService
@@ -636,8 +668,13 @@ export const authService = {
 
       const data = await res.json().catch(() => null);
 
-      if (!res.ok || (data && data.success === false)) {
-        throw new Error(data?.message || "Failed to send password reset email.");
+      if (!res.ok || data?.success === false) {
+        throw new Error(
+          sanitizeApiError(
+            data?.message,
+            "Failed to send password reset email. Please try again later."
+          )
+        );
       }
 
       return {
@@ -671,8 +708,13 @@ export const authService = {
 
       const data = await res.json().catch(() => null);
 
-      if (!res.ok || (data && data.success === false)) {
-        throw new Error(data?.message || "Failed to reset password. The link may be expired.");
+      if (!res.ok || data?.success === false) {
+        throw new Error(
+          sanitizeApiError(
+            data?.message,
+            "Failed to reset password. The link may be expired."
+          )
+        );
       }
 
       return {

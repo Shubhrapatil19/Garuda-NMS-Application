@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, UserPlus, Check, ArrowRight, Loader2 } from "lucide-react";
+import { X, UserPlus, ArrowRight, Loader2 } from "lucide-react";
 
 export interface OAuthAccount {
   name: string;
@@ -17,7 +17,7 @@ export interface OAuthSignInModalProps {
   onSelectAccount: (account: { name: string; email: string }) => Promise<void>;
 }
 
-export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
+export const OAuthSignInModal: React.FC<Readonly<OAuthSignInModalProps>> = ({
   isOpen,
   provider,
   organizationName,
@@ -62,7 +62,7 @@ export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
     }
   };
 
-  const handleCustomSubmit = async (e: React.FormEvent) => {
+  const handleCustomSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!customEmail.trim()) return;
 
@@ -82,15 +82,15 @@ export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
       <div
-        className="w-full max-w-[440px] rounded-2xl bg-[#0b1728] border border-[#1d3558] shadow-2xl overflow-hidden relative"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-110 rounded-2xl bg-[#0b1728] border border-[#1d3558] shadow-2xl overflow-hidden relative"
       >
         {/* Top Header Bar */}
         <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#162744]">
           <div className="flex items-center gap-3">
             {isGoogle ? (
               <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-md p-1.5 shrink-0">
-                <svg className="w-full h-full" viewBox="0 0 24 24">
+                <svg className="w-full h-full" viewBox="0 0 24 24" role="img" aria-hidden="true">
+                  <title>Google logo</title>
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -111,7 +111,8 @@ export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
               </div>
             ) : (
               <div className="w-9 h-9 rounded-full bg-[#161b22] border border-slate-700 flex items-center justify-center shadow-md p-2 shrink-0">
-                <svg className="w-full h-full fill-white" viewBox="0 0 24 24">
+                <svg className="w-full h-full fill-white" viewBox="0 0 24 24" role="img" aria-hidden="true">
+                  <title>GitHub logo</title>
                   <path
                     fillRule="evenodd"
                     clipRule="evenodd"
@@ -171,7 +172,7 @@ export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
                   } disabled:opacity-70 disabled:cursor-not-allowed`}
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-md">
+                    <div className="w-10 h-10 rounded-full bg-linear-to-tr from-blue-600 to-cyan-500 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-md">
                       {initials}
                     </div>
                     <div className="min-w-0">
@@ -208,10 +209,11 @@ export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
               <form onSubmit={handleCustomSubmit} className="pt-2 space-y-3">
                 <div className="p-3.5 rounded-xl bg-[#091528] border border-[#1c3355] space-y-2.5">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    <label htmlFor="oauth-custom-name" className="block text-[11px] font-medium text-slate-300 mb-1">
                       Full Name
                     </label>
                     <input
+                      id="oauth-custom-name"
                       type="text"
                       required
                       value={customName}
@@ -221,10 +223,11 @@ export const OAuthSignInModal: React.FC<OAuthSignInModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    <label htmlFor="oauth-custom-email" className="block text-[11px] font-medium text-slate-300 mb-1">
                       {isGoogle ? "Google Email" : "GitHub Email / Username"}
                     </label>
                     <input
+                      id="oauth-custom-email"
                       type="email"
                       required
                       value={customEmail}

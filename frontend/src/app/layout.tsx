@@ -37,6 +37,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 } else if (t === 'light') {
                   document.documentElement.classList.remove('dark');
                 }
+
+                // Synchronize auth cookie from localStorage so SSR and Next.js middleware recognize active session
+                const token = localStorage.getItem('garuda_auth_token');
+                const userStr = localStorage.getItem('garuda_auth_user');
+                if ((token || userStr) && !document.cookie.includes('garuda_auth_token=')) {
+                  const val = token || 'authenticated-session';
+                  document.cookie = 'garuda_auth_token=' + encodeURIComponent(val) + '; path=/; max-age=604800; SameSite=Lax';
+                }
+
+                // Synchronize last visited route cookie so refresh and root landing persist current page
+                const lastRoute = localStorage.getItem('garuda_last_route');
+                if (lastRoute && !document.cookie.includes('garuda_last_route=')) {
+                  document.cookie = 'garuda_last_route=' + encodeURIComponent(lastRoute) + '; path=/; max-age=604800; SameSite=Lax';
+                }
               } catch (_) {}
             `,
           }}

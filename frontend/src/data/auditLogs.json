@@ -1,0 +1,62 @@
+[
+  {
+    "id": "aud-001",
+    "timestamp": "2 mins ago",
+    "actor": "Jayesh Nikumbh",
+    "role": "Network Engineer",
+    "action": "ICMP Diagnostic Ping",
+    "target": "Core-Router-01 (10.24.1.1)",
+    "severity": "info",
+    "ip": "10.200.4.15"
+  },
+  {
+    "id": "aud-002",
+    "timestamp": "14 mins ago",
+    "actor": "System Administrator",
+    "role": "Administrator",
+    "action": "Update SNMP Timeout",
+    "target": "Olio Poller Global Engine",
+    "severity": "warning",
+    "ip": "10.200.1.2"
+  },
+  {
+    "id": "aud-003",
+    "timestamp": "45 mins ago",
+    "actor": "Jayesh Nikumbh",
+    "role": "Network Engineer",
+    "action": "Acknowledge Incident",
+    "target": "Incident ALT-104 (BOM-Switch-44)",
+    "severity": "info",
+    "ip": "10.200.4.15"
+  },
+  {
+    "id": "aud-004",
+    "timestamp": "1 hour ago",
+    "actor": "System Administrator",
+    "role": "Administrator",
+    "action": "Onboard Network Device",
+    "target": "DEL-EDGE-NEW-001 (10.20.4.61)",
+    "severity": "info",
+    "ip": "10.200.1.2"
+  },
+  {
+    "id": "aud-005",
+    "timestamp": "2 hours ago",
+    "actor": "System Administrator",
+    "role": "Administrator",
+    "action": "Slack Webhook Reconfiguration",
+    "target": "#tah-noc-triage Channel",
+    "severity": "warning",
+    "ip": "10.200.1.2"
+  },
+  {
+    "id": "aud-006",
+    "timestamp": "3 hours ago",
+    "actor": "Jayesh Nikumbh",
+    "role": "Network Engineer",
+    "action": "User Authentication",
+    "target": "Web Console Session",
+    "severity": "info",
+    "ip": "10.200.4.15"
+  }
+]

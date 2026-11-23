@@ -26,23 +26,10 @@ import { organizationService, Organization } from "@/services/organizationServic
 import OAuthSignInModal from "@/components/OAuthSignInModal";
 import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 import { toast } from "sonner";
+import { sanitizeApiError } from "@/utils/errorHandler";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isOAuthModalOpen, setIsOAuthModalOpen] = useState(false);
-  const [activeOAuthProvider, setActiveOAuthProvider] = useState<"GOOGLE" | "GITHUB" | null>(null);
-  const [isForgotPasswordModalOpen, setIsForgotPasswordModalOpen] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  // Organization dropdown state
+// Custom hook to manage Organization loading, searching, and selection
+function useOrganizationSelector() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
@@ -51,44 +38,39 @@ export default function LoginPage() {
   const orgDropdownRef = useRef<HTMLDivElement>(null);
   const orgSearchInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch organizations directly from backend API via organizationService on mount
   useEffect(() => {
+    let isMounted = true;
     const fetchOrganizations = async () => {
       setIsLoadingOrgs(true);
       try {
         const data = await organizationService.getOrganizations();
+        if (!isMounted) return;
         setOrganizations(data);
         if (data.length > 0) {
-          if (!selectedOrg || !data.some((d) => d.id === selectedOrg.id)) {
-            setSelectedOrg(data[0]);
-          }
+          setSelectedOrg((prev) => (!prev || !data.some((d) => d.id === prev.id) ? data[0] : prev));
         } else {
           setSelectedOrg(null);
         }
       } catch (err) {
         console.warn("Failed to load organizations:", err);
-        setOrganizations([]);
-        setSelectedOrg(null);
+        if (isMounted) {
+          setOrganizations([]);
+          setSelectedOrg(null);
+        }
       } finally {
-        setIsLoadingOrgs(false);
+        if (isMounted) setIsLoadingOrgs(false);
       }
     };
-    fetchOrganizations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    fetchOrganizations().catch((err) => {
+      console.warn("Failed to load organizations:", err);
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Check for email passed via query params (e.g. from signup redirect)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const emailParam = params.get("email");
-      if (emailParam) {
-        setUsername(emailParam);
-      }
-    }
-  }, []);
-
-  // Close org dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -103,36 +85,116 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Focus search input when dropdown opens
   useEffect(() => {
     if (isOrgDropdownOpen && orgSearchInputRef.current) {
       orgSearchInputRef.current.focus();
     }
   }, [isOrgDropdownOpen]);
 
-  // Filtered organizations based on search
+  const q = orgSearchQuery.toLowerCase();
   const filteredOrgs = organizations.filter(
     (org) =>
-      (org.name && org.name.toLowerCase().includes(orgSearchQuery.toLowerCase())) ||
-      (org.label && org.label.toLowerCase().includes(orgSearchQuery.toLowerCase())) ||
-      (org.domain && org.domain.toLowerCase().includes(orgSearchQuery.toLowerCase())) ||
-      (org.orgCode && org.orgCode.toLowerCase().includes(orgSearchQuery.toLowerCase()))
+      org.name?.toLowerCase().includes(q) ||
+      org.label?.toLowerCase().includes(q) ||
+      org.domain?.toLowerCase().includes(q) ||
+      org.orgCode?.toLowerCase().includes(q)
   );
 
-  // Build full email: username handle + @domain from selected org
+  const getOrgDisplayLabel = (): string => {
+    if (isLoadingOrgs) return "Loading organizations...";
+    if (selectedOrg) return selectedOrg.label;
+    if (organizations.length === 0) return "No organizations found";
+    return "Select organization";
+  };
+
+  return {
+    organizations,
+    selectedOrg,
+    setSelectedOrg,
+    isOrgDropdownOpen,
+    setIsOrgDropdownOpen,
+    orgSearchQuery,
+    setOrgSearchQuery,
+    filteredOrgs,
+    orgDropdownRef,
+    orgSearchInputRef,
+    getOrgDisplayLabel,
+  };
+}
+
+const validateLoginForm = (
+  trimmedUsername: string,
+  selectedOrg: Organization | null,
+  authMethod: "password" | "otp",
+  password: string,
+  otpCode: string
+): string => {
+  if (!trimmedUsername) {
+    return "Please enter your corporate email or handle.";
+  }
+  if (!selectedOrg) {
+    return "Please select your organization.";
+  }
+  if (authMethod === "password") {
+    if (!password) {
+      return "Please enter your password.";
+    }
+  } else {
+    const trimmedOtp = otpCode.trim();
+    if (!trimmedOtp) {
+      return "Please enter your 6-digit one-time code.";
+    }
+    if (trimmedOtp.length !== 6) {
+      return "One-time code must be exactly 6 digits.";
+    }
+  }
+  return "";
+};
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [username, setUsername] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("email") || "";
+    }
+    return "";
+  });
+  const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isOAuthModalOpen, setIsOAuthModalOpen] = useState(false);
+  const [activeOAuthProvider, setActiveOAuthProvider] = useState<"GOOGLE" | "GITHUB" | null>(null);
+  const [isForgotPasswordModalOpen, setIsForgotPasswordModalOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const {
+    selectedOrg,
+    setSelectedOrg,
+    isOrgDropdownOpen,
+    setIsOrgDropdownOpen,
+    orgSearchQuery,
+    setOrgSearchQuery,
+    filteredOrgs,
+    orgDropdownRef,
+    orgSearchInputRef,
+    getOrgDisplayLabel,
+  } = useOrganizationSelector();
+
   const getFullEmail = (handle: string): string => {
     const trimmed = handle.trim();
     if (!trimmed) return "";
-    // If user already typed a full email with @, use it as-is
     if (trimmed.includes("@")) return trimmed;
-    // Otherwise append the org domain
     if (selectedOrg) {
       return `${trimmed}@${selectedOrg.domain}`;
     }
     return trimmed;
   };
 
-  // Send one-time login code via API
   const handleSendLoginCode = async () => {
     const trimmedUsername = username.trim();
     if (!trimmedUsername) {
@@ -149,58 +211,35 @@ export default function LoginPage() {
         description: res.message || `Verification code sent to ${fullEmail}.`,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to send code.";
+      const msg = sanitizeApiError(err, "Failed to send verification code.");
       toast.error("Failed to Send Code", { description: msg });
     } finally {
       setIsSendingOtp(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg("");
 
     const trimmedUsername = username.trim();
-    if (!trimmedUsername) {
-      const msg = "Please enter your corporate email or handle.";
-      setErrorMsg(msg);
-      toast.error("Validation error", { description: msg });
+    const validationError = validateLoginForm(
+      trimmedUsername,
+      selectedOrg,
+      authMethod,
+      password,
+      otpCode
+    );
+
+    if (validationError) {
+      setErrorMsg(validationError);
+      toast.error("Validation error", { description: validationError });
       return;
     }
 
-    if (!selectedOrg) {
-      const msg = "Please select your organization.";
-      setErrorMsg(msg);
-      toast.error("Validation error", { description: msg });
-      return;
-    }
-
-    if (authMethod === "password") {
-      if (!password) {
-        const msg = "Please enter your password.";
-        setErrorMsg(msg);
-        toast.error("Validation error", { description: msg });
-        return;
-      }
-    } else {
-      const trimmedOtp = otpCode.trim();
-      if (!trimmedOtp) {
-        const msg = "Please enter your 6-digit one-time code.";
-        setErrorMsg(msg);
-        toast.error("Validation error", { description: msg });
-        return;
-      }
-      if (trimmedOtp.length !== 6) {
-        const msg = "One-time code must be exactly 6 digits.";
-        setErrorMsg(msg);
-        toast.error("Validation error", { description: msg });
-        return;
-      }
-    }
+    if (!selectedOrg) return;
 
     setIsLoading(true);
-
-    // Build the full email: handle + @org.domain
     const fullEmail = getFullEmail(trimmedUsername);
 
     try {
@@ -214,47 +253,46 @@ export default function LoginPage() {
         rememberMe,
       });
 
-      // Login Confirm (Success Toaster)
+      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const callback = params?.get("callbackUrl");
+      const last = typeof window !== "undefined" ? localStorage.getItem("garuda_last_route") : null;
+      const target =
+        callback && !callback.startsWith("/login") && !callback.startsWith("/signup")
+          ? callback
+          : last && !last.startsWith("/login") && !last.startsWith("/signup") && last !== "/"
+          ? last
+          : "/dashboard";
+
       toast.success("Login Confirmed", {
-        description: `Welcome back, ${session.name || session.username}! Redirecting to dashboard...`,
+        description: `Welcome back, ${session.name || session.username}! Redirecting...`,
       });
 
-      // Smooth transition to Network Operations Dashboard
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(target);
       }, 500);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to authenticate. Please check your credentials.";
+      const message = sanitizeApiError(
+        err,
+        "Failed to authenticate. Please check your credentials."
+      );
       setErrorMsg(message);
-
-      // Login Reject (Error Toaster)
-      toast.error("Login Rejected", {
-        description: message,
-      });
-
+      toast.error("Login Rejected", { description: message });
       setIsLoading(false);
     }
   };
 
-  // Open Google or GitHub OAuth Account Chooser popup
   const handleOpenOAuth = (provider: "GOOGLE" | "GITHUB") => {
     setErrorMsg("");
-
     if (!selectedOrg) {
       const msg = "Please select your organization first.";
       setErrorMsg(msg);
       toast.error("Organization Required", { description: msg });
       return;
     }
-
     setActiveOAuthProvider(provider);
     setIsOAuthModalOpen(true);
   };
 
-  // Process chosen account from the OAuth dialog
   const handleOAuthSelectAccount = async (account: { name: string; email: string }) => {
     if (!selectedOrg || !activeOAuthProvider) return;
 
@@ -267,80 +305,52 @@ export default function LoginPage() {
         fullName: account.name,
       });
 
-      setIsOAuthModalOpen(false);
+      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const callback = params?.get("callbackUrl");
+      const last = typeof window !== "undefined" ? localStorage.getItem("garuda_last_route") : null;
+      const target =
+        callback && !callback.startsWith("/login") && !callback.startsWith("/signup")
+          ? callback
+          : last && !last.startsWith("/login") && !last.startsWith("/signup") && last !== "/"
+          ? last
+          : "/dashboard";
 
-      toast.success("OAuth Authentication Confirmed", {
-        description: `Signed in as ${session.name}! Redirecting to dashboard...`,
+      setIsOAuthModalOpen(false);
+      toast.success("Single Sign-On Verified", {
+        description: `Signed in as ${session.name || account.email}. Redirecting...`,
       });
 
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(target);
       }, 500);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : `Failed to authenticate with ${activeOAuthProvider}.`;
+      const msg = sanitizeApiError(err, "OAuth authentication failed.");
       setErrorMsg(msg);
-      toast.error("OAuth Authentication Failed", { description: msg });
-      throw err;
+      toast.error("OAuth Error", { description: msg });
     }
   };
 
   return (
-    <div className="min-h-screen lg:h-screen lg:max-h-screen w-full bg-[#071120] text-slate-300 font-sans antialiased overflow-x-hidden lg:overflow-hidden select-none">
-      {/* Bulletproof dark mode autofill override for Chrome/Edge */}
-      <style>{`
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover,
-        input:-webkit-autofill:focus,
-        input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 1000px #091528 inset !important;
-          box-shadow: 0 0 0 1000px #091528 inset !important;
-          -webkit-text-fill-color: #f1f5f9 !important;
-          caret-color: #f1f5f9 !important;
-          transition: background-color 50000s ease-in-out 0s !important;
-        }
-        input:autofill,
-        input:autofill:hover,
-        input:autofill:focus,
-        input:autofill:active {
-          -webkit-box-shadow: 0 0 0 1000px #091528 inset !important;
-          box-shadow: 0 0 0 1000px #091528 inset !important;
-          -webkit-text-fill-color: #f1f5f9 !important;
-          caret-color: #f1f5f9 !important;
-          transition: background-color 50000s ease-in-out 0s !important;
-        }
-      `}</style>
-      {/* Ambient soft background glows */}
-      <div className="fixed top-10 left-[15%] w-125 h-125 rounded-full bg-blue-600/[0.08] blur-[140px] pointer-events-none" />
-      <div className="fixed bottom-10 left-[35%] w-112.5 h-112.5 rounded-full bg-cyan-500/[0.05] blur-[150px] pointer-events-none" />
+    <div className="relative w-full h-screen max-h-screen overflow-hidden bg-[#040811] text-slate-100 flex flex-col justify-between select-none font-sans">
+      <div className="fixed top-10 left-[15%] w-125 h-125 rounded-full bg-blue-600/8 blur-[140px] pointer-events-none" />
+      <div className="fixed bottom-10 left-[35%] w-112.5 h-112.5 rounded-full bg-cyan-500/5 blur-[150px] pointer-events-none" />
 
-      {/* Main 2-column layout */}
-      <div className="relative z-10 flex flex-col lg:flex-row h-full min-h-screen lg:min-h-0">
-
-        {/*LEFT COLUMN: BRAND, HERO & INTEGRATED NETWORK TOPOLOGY*/}
-        <div className="hidden lg:flex flex-1 flex-col justify-between p-7 xl:p-10 2xl:p-12 lg:h-full lg:overflow-hidden border-r border-[#12233b]/80 bg-[#081426]">
-
-          {/* Top Bar: Brand Logo & Status */}
-          <header className="animate-hero-header flex-shrink-0 flex flex-row items-center justify-between gap-4">
+      <div className="relative z-10 flex flex-col lg:flex-row flex-1 w-full h-full min-h-0 overflow-hidden">
+        <div className="hidden lg:flex flex-1 flex-col justify-between p-6 xl:p-8 2xl:p-10 h-full overflow-hidden border-r border-[#12233b]/80 bg-[#081426]">
+          <header className="animate-hero-header shrink-0 flex flex-row items-center justify-between gap-4">
             <GarudaLogo theme="dark" />
           </header>
 
-          {/* Hero Section & Topology Map directly integrated on background */}
-          <div className="flex-1 min-h-0 flex flex-col justify-center my-4 xl:my-6 w-full">
-            {/* Tagline & Main Heading */}
-            <div className="flex-shrink-0 mb-4 xl:mb-6">
-              <div className="animate-hero-tagline flex items-center gap-2.5 text-[11px] font-bold tracking-[0.2em] text-blue-500 uppercase mb-3">
-                <span className="animate-hero-line inline-block h-[2px] bg-blue-500" />
-                GARUDA OPERATIONS CLOUD
+          <div className="flex-1 min-h-0 flex flex-col justify-center my-3 xl:my-4 w-full">
+            <div className="shrink-0 mb-3 xl:mb-4">
+              <div className="animate-hero-tagline flex items-center gap-2 text-[11px] font-bold tracking-[0.2em] text-blue-500 uppercase mb-2">
+                <span className="animate-hero-line inline-block h-0.5 bg-blue-500" />
+                <span>GARUDA OPERATIONS CLOUD</span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl lg:text-[40px] xl:text-[46px] 2xl:text-[50px] font-extrabold text-white tracking-tight leading-[1.12]">
+              <h1 className="text-3xl sm:text-4xl lg:text-[38px] xl:text-[44px] 2xl:text-[48px] font-extrabold text-white tracking-tight leading-[1.12]">
                 <div className="overflow-hidden">
-                  <span className="inline-block animate-hero-title-1">
-                    Unified Network
-                  </span>
+                  <span className="inline-block animate-hero-title-1">Unified Network</span>
                 </div>
                 <div className="overflow-hidden">
                   <span className="inline-block animate-hero-title-2">
@@ -349,72 +359,64 @@ export default function LoginPage() {
                 </div>
               </h1>
 
-              <p className="animate-hero-desc mt-3 text-[14px] sm:text-[15px] xl:text-[16px] leading-relaxed text-slate-400 max-w-[520px]">
-                One secure command center for visibility, performance, and control
-                across your entire network estate.
+              <p className="animate-hero-desc mt-2.5 text-[13px] sm:text-[14px] xl:text-[15px] leading-relaxed text-slate-400 max-w-120">
+                One secure command center for visibility, performance, and control across your entire network estate.
               </p>
             </div>
 
-            {/* ── Network Topology Map (Standalone Component with Process Draw Animation) ── */}
             <NetworkTopologyMap />
           </div>
 
-          {/* Bottom Bar: Trusted Partners */}
-          <footer className="animate-hero-footer flex-shrink-0 pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] sm:text-[11px]">
+          <footer className="animate-hero-footer shrink-0 pt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[10px] sm:text-[11px]">
             <span className="font-semibold tracking-[0.18em] text-slate-500 uppercase">
               TRUSTED FOR MISSION-CRITICAL OPERATIONS
             </span>
             <div className="flex items-center gap-4 sm:gap-6 text-slate-500 font-bold tracking-widest text-[11px]">
-              <span className="hover:text-slate-300 transition-colors cursor-default">CISCO</span>
-              <span className="hover:text-slate-300 transition-colors cursor-default">FORTINET</span>
-              <span className="hover:text-slate-300 transition-colors cursor-default">JUNIPER</span>
-              <span className="hover:text-slate-300 transition-colors cursor-default">HUAWEI</span>
-              <span className="hover:text-slate-300 transition-colors cursor-default">ARISTA</span>
+              <span>CISCO</span>
+              <span>FORTINET</span>
+              <span>JUNIPER</span>
+              <span>HUAWEI</span>
+              <span>ARISTA</span>
             </div>
           </footer>
         </div>
 
-        {/*RIGHT COLUMN: AUTHENTICATION / LOGIN PANEL*/}
-        <div className="w-full lg:w-[440px] xl:w-[480px] 2xl:w-[520px] flex-1 lg:flex-initial flex-shrink-0 bg-[#060d19] flex flex-col justify-between p-4 sm:p-7 md:p-8 lg:p-7 xl:p-9 2xl:p-12 relative shadow-2xl min-h-screen lg:min-h-0 lg:h-full lg:overflow-y-auto">
-          {/* Subtle background glow */}
-          <div className="absolute top-1/4 right-0 w-[240px] h-[240px] bg-blue-600/[0.04] blur-[100px] pointer-events-none" />
+        <div className="w-full lg:w-105 xl:w-115 2xl:w-122.5 flex-1 lg:flex-initial shrink-0 bg-[#060d19] flex flex-col justify-between p-4 sm:p-5 xl:p-6 2xl:p-7 relative shadow-2xl h-full overflow-y-auto">
+          <div className="absolute top-1/4 right-0 w-60 h-60 bg-blue-600/4 blur-[100px] pointer-events-none" />
 
-          {/* Centered Form Wrapper */}
-          <div className="w-full max-w-[400px] mx-auto my-auto relative z-10 flex flex-col py-4 sm:py-0">
-            {/* Mobile Brand Header (< lg only) */}
-            <div className="lg:hidden flex items-center justify-between pb-4 mb-3 border-b border-[#12233b]/80">
+          <div className="w-full max-w-90 xl:max-w-95 mx-auto my-auto relative z-10 flex flex-col py-1">
+            <div className="lg:hidden flex items-center justify-between pb-3 mb-2.5 border-b border-[#12233b]/80">
               <GarudaLogo size="sm" theme="dark" />
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                NOC Operational
+                <span>NOC Operational</span>
               </span>
             </div>
 
-            {/* Secure access badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0a1830] border border-[#1d355d] text-[10px] font-semibold text-blue-400 uppercase tracking-wider self-start mb-2.5 sm:mb-3 xl:mb-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0a1830] border border-[#1d355d] text-[10px] font-semibold text-blue-400 uppercase tracking-wider self-start mb-2">
               <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              SECURE ACCESS
+              <span>SECURE ACCESS</span>
             </div>
 
-            <h2 className="text-2xl sm:text-[28px] xl:text-[32px] font-bold text-white tracking-tight leading-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-tight">
               Welcome back
             </h2>
-            <p className="mt-1 text-xs sm:text-[14px] text-slate-400">
+            <p className="mt-0.5 text-xs text-slate-400">
               Sign in to access your network operations workspace.
             </p>
 
-            {/* Auth Method Tabs */}
-            <div className="mt-4 xl:mt-5 p-1 rounded-xl bg-[#091426] border border-[#162744] grid grid-cols-2 gap-1">
+            <div className="mt-2.5 xl:mt-3 p-1 rounded-xl bg-[#091426] border border-[#162744] grid grid-cols-2 gap-1">
               <button
                 type="button"
                 onClick={() => {
                   setAuthMethod("password");
                   setErrorMsg("");
                 }}
-                className={`py-2 text-xs sm:text-[13px] font-semibold rounded-lg transition-all cursor-pointer ${authMethod === "password"
-                  ? "bg-[#162744] text-white shadow-sm border border-slate-700/40"
-                  : "text-slate-400 hover:text-slate-200 border border-transparent"
-                  }`}
+                className={`py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authMethod === "password"
+                    ? "bg-[#162744] text-white shadow-sm border border-slate-700/40"
+                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                }`}
               >
                 Password
               </button>
@@ -424,71 +426,69 @@ export default function LoginPage() {
                   setAuthMethod("otp");
                   setErrorMsg("");
                 }}
-                className={`py-2 text-xs sm:text-[13px] font-semibold rounded-lg transition-all cursor-pointer ${authMethod === "otp"
-                  ? "bg-[#162744] text-white shadow-sm border border-slate-700/40"
-                  : "text-slate-400 hover:text-slate-200 border border-transparent"
-                  }`}
+                className={`py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authMethod === "otp"
+                    ? "bg-[#162744] text-white shadow-sm border border-slate-700/40"
+                    : "text-slate-400 hover:text-slate-200 border border-transparent"
+                }`}
               >
                 One-time code
               </button>
             </div>
 
-            {/* Login Form */}
-            <form onSubmit={handleSubmit} className="mt-4 xl:mt-5 flex flex-col gap-3 xl:gap-3.5">
-              {/* Customer / Organization — Searchable Dropdown */}
+            <form onSubmit={handleSubmit} className="mt-2.5 xl:mt-3 flex flex-col gap-2 xl:gap-2.5">
+              {errorMsg && (
+                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                  {errorMsg}
+                </div>
+              )}
+
               <div ref={orgDropdownRef} className="relative">
-                <label className="block text-[11px] sm:text-xs font-medium text-slate-300 mb-1.5">
+                <label htmlFor="org-select-button" className="block text-[11px] font-medium text-slate-300 mb-1">
                   Customer / Organization
                 </label>
                 <button
+                  id="org-select-button"
                   type="button"
                   onClick={() => {
                     setIsOrgDropdownOpen(!isOrgDropdownOpen);
                     setOrgSearchQuery("");
                   }}
-                  className="w-full flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-[44px] overflow-hidden transition-all hover:border-[#1e3a5f] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 cursor-pointer outline-none"
+                  className="w-full flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-9.5 overflow-hidden transition-all hover:border-[#1e3a5f] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 cursor-pointer outline-none"
                 >
-                  <Building2 className="ml-3.5 w-4 h-4 text-slate-400 shrink-0" />
+                  <Building2 className="ml-3 w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span
-                    className={`flex-1 text-left py-2.5 sm:py-3 px-3 text-sm truncate font-normal ${selectedOrg ? "text-slate-100" : "text-slate-400"
-                      }`}
+                    className={`flex-1 text-left py-2 px-2.5 text-xs sm:text-[13px] truncate font-normal ${
+                      selectedOrg ? "text-slate-100" : "text-slate-400"
+                    }`}
                   >
-                    {isLoadingOrgs
-                      ? "Loading organizations..."
-                      : selectedOrg
-                        ? selectedOrg.label
-                        : organizations.length === 0
-                          ? "No organizations found"
-                          : "Select organization"}
+                    {getOrgDisplayLabel()}
                   </span>
                   <ChevronDown
-                    className={`mr-3 w-4 h-4 text-slate-500 shrink-0 transition-transform duration-200 ${isOrgDropdownOpen ? "rotate-180" : ""
-                      }`}
+                    className={`mr-3 w-3.5 h-3.5 text-slate-500 shrink-0 transition-transform duration-200 ${
+                      isOrgDropdownOpen ? "rotate-180" : ""
+                    }`}
                   />
                 </button>
 
-                {/* Dropdown Panel */}
                 {isOrgDropdownOpen && (
                   <div className="absolute z-50 mt-1.5 w-full rounded-xl bg-[#0b1a30] border border-[#1d355d] shadow-2xl shadow-black/40 overflow-hidden animate-fade-in">
-                    {/* Search inside dropdown */}
-                    <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#162744]">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-[#162744]">
                       <Search className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                       <input
                         ref={orgSearchInputRef}
                         type="text"
                         value={orgSearchQuery}
                         onChange={(e) => setOrgSearchQuery(e.target.value)}
-                        placeholder="Search organizations..."
-                        className="flex-1 bg-transparent text-xs text-slate-200 placeholder-slate-500 outline-none min-w-0"
+                        placeholder="Search organization by name, code or domain..."
+                        className="w-full bg-transparent text-xs text-slate-200 placeholder-slate-500 outline-none"
                       />
                     </div>
 
-                    {/* Organization list */}
-                    <div className="max-h-[220px] overflow-y-auto">
+                    <div className="max-h-48 overflow-y-auto py-1">
                       {filteredOrgs.length === 0 ? (
-                        <div className="px-4 py-6 text-xs text-slate-400 text-center flex flex-col items-center justify-center gap-1.5">
-                          <Building2 className="w-5 h-5 text-slate-500 mb-0.5" />
-                          <span className="font-medium text-slate-300">No organizations found</span>
+                        <div className="py-5 px-4 text-center text-xs text-slate-500">
+                          No matching organizations found
                         </div>
                       ) : (
                         filteredOrgs.map((org) => (
@@ -500,21 +500,29 @@ export default function LoginPage() {
                               setIsOrgDropdownOpen(false);
                               setOrgSearchQuery("");
                             }}
-                            className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors cursor-pointer ${selectedOrg?.id === org.id
-                              ? "bg-blue-600/15 text-blue-400"
-                              : "text-slate-300 hover:bg-[#111f38]"
-                              }`}
+                            className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left text-xs transition-colors cursor-pointer ${
+                              selectedOrg?.id === org.id
+                                ? "bg-blue-600/15 text-blue-400"
+                                : "text-slate-300 hover:bg-[#12233b]"
+                            }`}
                           >
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-medium truncate">
-                                {org.name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                {org.label} · @{org.domain}
+                            <div className="flex flex-col min-w-0 pr-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-slate-100 truncate text-[13px]">
+                                  {org.name}
+                                </span>
+                                {org.orgCode && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#162744] text-blue-400 border border-blue-500/20 shrink-0">
+                                    {org.orgCode}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-400 truncate mt-0.5">
+                                {org.label ? `${org.label} · ` : ""}@{org.domain}
                               </span>
                             </div>
                             {selectedOrg?.id === org.id && (
-                              <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 ml-2" />
+                              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                             )}
                           </button>
                         ))
@@ -524,64 +532,59 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {/* Username or email — with org domain suffix */}
               <div>
-                <label className="block text-[11px] sm:text-xs font-medium text-slate-300 mb-1.5">
+                <label htmlFor="login-username" className="block text-[11px] font-medium text-slate-300 mb-1">
                   Username or email
                 </label>
-                <div className="flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-[44px] overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                  <User className="ml-3.5 w-4 h-4 text-slate-400 shrink-0" />
+                <div className="flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-9.5 overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                  <User className="ml-3 w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <input
+                    id="login-username"
                     required
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder={selectedOrg ? `username` : "Username or email"}
-                    className="flex-1 bg-transparent py-2.5 sm:py-3 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none min-w-0 font-normal"
+                    placeholder={selectedOrg ? "username" : "Username or email"}
+                    className="flex-1 bg-transparent py-2 px-2.5 text-xs sm:text-[13px] text-slate-100 placeholder-slate-500 outline-none min-w-0 font-normal"
                   />
-                  {/* Show @domain suffix when org is selected and user hasn't typed @ */}
                   {selectedOrg && !username.includes("@") && (
-                    <span className="pr-3.5 text-sm text-slate-500 font-normal shrink-0 select-none">
+                    <span className="pr-3 text-xs text-slate-500 font-normal shrink-0 select-none">
                       @{selectedOrg.domain}
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Password or OTP */}
               {authMethod === "password" ? (
                 <div>
-                  <label className="block text-[11px] sm:text-xs font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="login-password" className="block text-[11px] font-medium text-slate-300 mb-1">
                     Password
                   </label>
-                  <div className="flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-[44px] overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                    <Lock className="ml-3.5 w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-9.5 overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                    <Lock className="ml-3 w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <input
+                      id="login-password"
                       required
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter password"
-                      className="flex-1 bg-transparent py-2.5 sm:py-3 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none min-w-0 font-normal"
+                      className="flex-1 bg-transparent py-2 px-2.5 text-xs sm:text-[13px] text-slate-100 placeholder-slate-500 outline-none min-w-0 font-normal"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="pr-3.5 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                      className="pr-3 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                       aria-label="Toggle password visibility"
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[11px] sm:text-xs font-medium text-slate-300">
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="login-otp" className="block text-[11px] font-medium text-slate-300">
                       One-time code
                     </label>
                     <button
@@ -593,110 +596,95 @@ export default function LoginPage() {
                       {isSendingOtp ? "Sending..." : "Send code"}
                     </button>
                   </div>
-                  <div className="flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-[44px] overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                    <KeyRound className="ml-3.5 w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="flex items-center rounded-xl bg-[#091528] border border-[#182a47] min-h-9.5 overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                    <KeyRound className="ml-3 w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <input
+                      id="login-otp"
                       required
                       type="text"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="6-digit code"
-                      maxLength={6}
-                      className="flex-1 bg-transparent py-2.5 sm:py-3 px-3 text-sm text-slate-100 placeholder-slate-500 outline-none tracking-[0.3em] font-mono min-w-0"
+                      placeholder="Enter 6-digit code"
+                      className="flex-1 bg-transparent py-2 px-2.5 text-xs sm:text-[13px] text-slate-100 placeholder-slate-500 outline-none min-w-0 font-normal tracking-widest font-mono"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Remember me & Forgot Password */}
               <div className="flex items-center justify-between pt-0.5">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-700 bg-[#091528] text-blue-600 accent-blue-600 focus:ring-0 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded bg-[#091528] border-[#182a47] text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
                   />
-                  <span className="text-[12px] sm:text-[13px] text-slate-300">
-                    Remember me
-                  </span>
+                  <span className="text-xs text-slate-400">Remember this device</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsForgotPasswordModalOpen(true)}
-                  className="text-[12px] sm:text-[13px] text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
-                >
-                  Forgot password?
-                </button>
+
+                {authMethod === "password" && (
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPasswordModalOpen(true)}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-medium hover:underline transition-colors cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                )}
               </div>
 
-              {/* Submit Sign In Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="mt-1 w-full py-2.5 sm:py-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-[13px] sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40 hover:-translate-y-px active:translate-y-0 transition-all cursor-pointer"
+                className="w-full mt-1.5 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-[13px] font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="animate-spin w-4 h-4 text-white" />
-                    Signing in to NOC...
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Signing in...</span>
                   </>
                 ) : (
                   <>
-                    Sign in
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Sign in to console</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}
               </button>
             </form>
 
-            {/* OR Divider */}
-            <div className="flex items-center gap-3 my-3 xl:my-4">
-              <div className="flex-1 h-px bg-[#15243b]" />
-              <span className="text-[10px] font-semibold text-slate-500 tracking-widest uppercase">
-                OR
+            <div className="relative my-2 xl:my-2.5 flex items-center justify-center">
+              <div className="border-t border-[#12233b] w-full" />
+              <span className="bg-[#060d19] px-2.5 text-[10px] font-semibold tracking-wider text-slate-500 uppercase shrink-0">
+                Or 
               </span>
-              <div className="flex-1 h-px bg-[#15243b]" />
+              <div className="border-t border-[#12233b] w-full" />
             </div>
 
-            {/* Login with Google & GitHub */}
-            <div className="w-full flex flex-col gap-2.5">
-              {/* Google Button */}
+            <div className="w-full flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => handleOpenOAuth("GOOGLE")}
                 disabled={isLoading}
-                className="group w-full py-2.5 px-3.5 rounded-xl bg-[#091528] hover:bg-[#0e1d35] border border-[#182a47] hover:border-slate-500/50 text-slate-200 text-[12px] sm:text-[13px] font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                className="group w-full py-2 px-3 rounded-xl bg-[#091528] hover:bg-[#0e1d35] border border-[#182a47] hover:border-slate-500/50 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" role="img" aria-hidden="true">
+                  <title>Google icon</title>
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
                 <span>Continue with Google</span>
               </button>
 
-              {/* GitHub Button */}
               <button
                 type="button"
                 onClick={() => handleOpenOAuth("GITHUB")}
                 disabled={isLoading}
-                className="group w-full py-2.5 px-3.5 rounded-xl bg-[#091528] hover:bg-[#0e1d35] border border-[#182a47] hover:border-slate-500/50 text-slate-200 text-[12px] sm:text-[13px] font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                className="group w-full py-2 px-3 rounded-xl bg-[#091528] hover:bg-[#0e1d35] border border-[#182a47] hover:border-slate-500/50 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <svg className="w-4 h-4 text-white shrink-0 fill-current" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 text-white shrink-0 fill-current" viewBox="0 0 24 24" role="img" aria-hidden="true">
+                  <title>GitHub icon</title>
                   <path
                     fillRule="evenodd"
                     clipRule="evenodd"
@@ -707,8 +695,7 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Signup Link */}
-            <div className="mt-3.5 text-center text-xs text-slate-400">
+            <div className="mt-2 text-center text-xs text-slate-400">
               Don&apos;t have an enterprise account?{" "}
               <Link
                 href="/signup"
@@ -719,48 +706,46 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            {/* Security note */}
-            <div className="mt-2.5 xl:mt-3 flex items-center justify-center gap-1.5 text-[11px] text-slate-500 text-center">
+            <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 text-center">
               <Shield className="w-3.5 h-3.5 shrink-0" />
               <span>Supports SAML 2.0 and OpenID Connect</span>
             </div>
 
-            {/* Mobile Trusted Partners Strip (< lg only) */}
-            <div className="lg:hidden mt-6 pt-5 border-t border-[#12233b]/70 text-center">
-              <span className="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase block mb-2.5">
+            <div className="lg:hidden mt-4 pt-3 border-t border-[#12233b]/70 text-center">
+              <span className="text-[10px] font-semibold tracking-[0.16em] text-slate-500 uppercase block mb-1.5">
                 TRUSTED FOR MISSION-CRITICAL OPERATIONS
               </span>
-              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-slate-500 font-bold tracking-widest text-[11px]">
-                <span className="hover:text-slate-300 transition-colors">CISCO</span>
-                <span className="hover:text-slate-300 transition-colors">FORTINET</span>
-                <span className="hover:text-slate-300 transition-colors">JUNIPER</span>
-                <span className="hover:text-slate-300 transition-colors">HUAWEI</span>
-                <span className="hover:text-slate-300 transition-colors">ARISTA</span>
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-slate-500 font-bold tracking-widest text-[10px]">
+                <span>CISCO</span>
+                <span>FORTINET</span>
+                <span>JUNIPER</span>
+                <span>HUAWEI</span>
+                <span>ARISTA</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column Footer (Clean responsive layout) */}
-          <footer className="flex-shrink-0 pt-6 lg:pt-4 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2.5 text-center sm:text-left">
+          <footer className="shrink-0 pt-2 lg:pt-2 flex flex-col sm:flex-row items-center justify-between text-[10px] xl:text-[11px] text-slate-500 gap-2 text-center sm:text-left">
             <span>© 2026 Garuda NMS</span>
             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-              <a href="#" className="hover:text-slate-300 transition-colors">
+              <Link href="/privacy" className="hover:text-slate-300 transition-colors">
                 Privacy
-              </a>
-              <a href="#" className="hover:text-slate-300 transition-colors">
+              </Link>
+              <Link href="/security" className="hover:text-slate-300 transition-colors">
                 Security
-              </a>
-              <a href="#" className="hover:text-slate-300 transition-colors">
+              </Link>
+              <Link href="/help" className="hover:text-slate-300 transition-colors">
                 Help center
-              </a>
-              <a href="#" className="hover:text-slate-300 transition-colors flex flex-row items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5" />AP-SOUTH-1
-              </a>
+              </Link>
+              <span className="hover:text-slate-300 transition-colors flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                <span>AP-SOUTH-1</span>
+              </span>
             </div>
           </footer>
         </div>
       </div>
-      {/* OAuth Sign-In Popup Box (Google & GitHub) */}
+
       <OAuthSignInModal
         isOpen={isOAuthModalOpen}
         provider={activeOAuthProvider}
@@ -769,7 +754,6 @@ export default function LoginPage() {
         onSelectAccount={handleOAuthSelectAccount}
       />
 
-      {/* Forgot Password Reset Email Modal */}
       <ForgotPasswordModal
         isOpen={isForgotPasswordModalOpen}
         initialEmail={username.trim() ? getFullEmail(username.trim()) : ""}

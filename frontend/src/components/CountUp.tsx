@@ -35,27 +35,31 @@ export const CountUp: React.FC<CountUpProps> = ({
   const isNumeric = !Number.isNaN(numericValue) && Number.isFinite(numericValue);
 
   // Auto detect decimals if not explicitly specified
-  const decimalPlaces =
-    typeof decimals === "number"
-      ? decimals
-      : typeof value === "string" && value.includes(".")
-      ? value.split(".")[1]?.replace(/\D/g, "").length || 0
-      : 0;
+  let decimalPlaces = 0;
+  if (typeof decimals === "number") {
+    decimalPlaces = decimals;
+  } else if (typeof value === "string" && value.includes(".")) {
+    decimalPlaces = value.split(".")[1]?.replace(/\D/g, "").length || 0;
+  }
 
   const [displayValue, setDisplayValue] = useState<number>(0);
   const prevValueRef = useRef<number>(0);
   const isFirstRenderRef = useRef<boolean>(true);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     if (!isNumeric) return;
 
-    let timeoutId: NodeJS.Timeout;
-    let animationFrameId: number;
     const startVal = isFirstRenderRef.current ? 0 : prevValueRef.current;
     const endVal = numericValue;
     let startTime: number | null = null;
+    let animationFrameId: number;
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       const step = (timestamp: number) => {
         if (!startTime) startTime = timestamp;
         const elapsed = timestamp - startTime;
@@ -73,7 +77,7 @@ export const CountUp: React.FC<CountUpProps> = ({
           setDisplayValue(endVal);
           prevValueRef.current = endVal;
           isFirstRenderRef.current = false;
-          onComplete?.();
+          onCompleteRef.current?.();
         }
       };
 

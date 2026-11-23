@@ -7,21 +7,14 @@ import {
   RotateCw,
   Bell,
   LogOut,
-  User as UserIcon,
   Shield,
-  ShieldCheck,
-  Check,
-  Activity,
   ChevronDown,
   Building,
   X,
   Menu,
   Sun,
   Moon,
-  Lock,
 } from "lucide-react";
-import { authService, UserRole } from "@/services/authService";
-import { toast } from "sonner";
 
 import dbData from "../../data/db.json";
 
@@ -82,23 +75,24 @@ export const Header: React.FC<HeaderProps> = ({
   const router = useRouter();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  // Initialize theme from localStorage or document class
-  useEffect(() => {
-    const saved = localStorage.getItem("garuda-theme") as "light" | "dark" | null;
-    if (saved) {
-      setTheme(saved);
-      if (saved === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    } else {
-      const isDark = document.documentElement.classList.contains("dark");
-      setTheme(isDark ? "dark" : "light");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("garuda-theme") as "light" | "dark" | null;
+      if (saved) return saved;
+      return document.documentElement.classList.contains("dark") ? "dark" : "light";
     }
-  }, []);
+    return "light";
+  });
+
+  // Synchronize DOM class and localStorage when theme changes
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("garuda-theme", theme);
+  }, [theme]);
 
   const toggleTheme = () => {
     const nextTheme = theme === "dark" ? "light" : "dark";
@@ -135,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className={`h-[68px] shrink-0 px-4 sm:px-6 lg:px-8 bg-white dark:bg-[#081220] border-b border-slate-200/80 dark:border-[#14233a] flex items-center justify-between gap-3 sm:gap-4 sticky top-0 z-20 shadow-xs transition-colors ${className}`}
+      className={`h-17 shrink-0 px-4 sm:px-6 lg:px-8 bg-white dark:bg-[#081220] border-b border-slate-200/80 dark:border-[#14233a] flex items-center justify-between gap-3 sm:gap-4 sticky top-0 z-20 shadow-xs transition-colors ${className}`}
     >
       {/* ─── Left Section: Mobile Menu Toggle, Title & Engine Status Chip ─── */}
       <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 pl-1 lg:pl-3">
@@ -155,21 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           {title}
         </h2>
 
-        {/* Engine Status Chip */}
-        {engineStatus && (
-          <div className="hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs font-semibold shrink-0 select-none">
-            <span
-              className={`w-2 h-2 rounded-full ${engineStatus.isOnline !== false
-                ? "bg-emerald-500 animate-pulse"
-                : "bg-rose-500"
-                }`}
-            />
-            <span>
-              {engineStatus.name || "Olio Poller Engine"}:{" "}
-              <b className="font-bold">{engineStatus.status || "Online"}</b>
-            </span>
-          </div>
-        )}
+        
       </div>
 
       {/* ─── Right Section: Search, Sync, Notification, User Profile ─── */}
@@ -273,10 +253,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Optional User Details for Desktop */}
             <div className="hidden xl:flex flex-col text-left leading-tight pr-1">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-30">
                 {user?.name}
               </span>
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-30">
                 {user?.role}
               </span>
             </div>
@@ -330,6 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="text-slate-500 dark:text-slate-400">Status</span>
                   <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {" "}
                     Online & Active
                   </span>
                 </div>

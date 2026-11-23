@@ -11,6 +11,26 @@ export interface GarudaLogoProps {
   className?: string;
 }
 
+function getTitleThemeClass(theme: "dark" | "light" | "auto"): string {
+  if (theme === "light") {
+    return "text-slate-900 group-hover:text-slate-800";
+  }
+  if (theme === "dark") {
+    return "text-white group-hover:text-slate-100";
+  }
+  return "text-slate-900 dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100";
+}
+
+function getSubtitleThemeClass(theme: "dark" | "light" | "auto"): string {
+  if (theme === "light") {
+    return "text-slate-500";
+  }
+  if (theme === "dark") {
+    return "text-slate-400";
+  }
+  return "text-slate-500 dark:text-slate-400";
+}
+
 export default function GarudaLogo({
   size = "md",
   showSubtitle = true,
@@ -18,7 +38,7 @@ export default function GarudaLogo({
   theme = "auto",
   href,
   className = "",
-}: GarudaLogoProps) {
+}: Readonly<GarudaLogoProps>) {
   const sizeStyles = {
     sm: {
       box: "w-8 h-8 rounded-lg",
@@ -43,6 +63,9 @@ export default function GarudaLogo({
     },
   }[size];
 
+  const titleThemeClass = getTitleThemeClass(theme);
+  const subtitleThemeClass = getSubtitleThemeClass(theme);
+
   const content = (
     <div
       className={`inline-flex items-center ${sizeStyles.gap} select-none group ${className}`}
@@ -65,30 +88,18 @@ export default function GarudaLogo({
       <div
         className={`flex flex-col transition-all duration-300 overflow-hidden ${
           showText
-            ? "max-w-[220px] opacity-100"
+            ? "max-w-55 opacity-100"
             : "max-w-0 opacity-0 pointer-events-none"
         }`}
       >
         <span
-          className={`${sizeStyles.title} font-extrabold tracking-wider whitespace-nowrap ${
-            theme === "light"
-              ? "text-slate-900 group-hover:text-slate-800"
-              : theme === "dark"
-              ? "text-white group-hover:text-slate-100"
-              : "text-slate-900 dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100"
-          } uppercase leading-none transition-colors duration-200`}
+          className={`${sizeStyles.title} font-extrabold tracking-wider whitespace-nowrap ${titleThemeClass} uppercase leading-none transition-colors duration-200`}
         >
           GARUDA <span className="text-blue-500">NMS</span>
         </span>
         {showSubtitle && (
           <span
-            className={`${sizeStyles.sub} whitespace-nowrap ${
-              theme === "light"
-                ? "text-slate-500"
-                : theme === "dark"
-                ? "text-slate-400"
-                : "text-slate-500 dark:text-slate-400"
-            } font-medium uppercase mt-0.5`}
+            className={`${sizeStyles.sub} whitespace-nowrap ${subtitleThemeClass} font-medium uppercase mt-0.5`}
           >
             NETWORK MANAGEMENT SYSTEM
           </span>

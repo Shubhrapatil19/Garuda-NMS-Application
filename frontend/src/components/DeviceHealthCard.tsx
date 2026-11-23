@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect, useId } from "react";
 import CountUp from "./CountUp";
-import dbData from "../../data/db.json";
 
-export interface DeviceHealthBreakdownItem {
+export interface StatusBreakdownItem {
   label: string;
   count: number;
   percentage: number;
@@ -12,21 +11,20 @@ export interface DeviceHealthBreakdownItem {
 }
 
 export interface DeviceHealthData {
-  total?: number;
-  breakdown: DeviceHealthBreakdownItem[];
+  monitoredAssets?: number;
+  operationalRate?: string;
+  breakdown?: StatusBreakdownItem[];
 }
 
 export interface DeviceHealthCardProps {
   data?: DeviceHealthData;
-  operationalRate?: string;
   monitoredAssets?: number;
   className?: string;
 }
 
 export const DeviceHealthCard: React.FC<DeviceHealthCardProps> = ({
-  data = dbData.dashboard.deviceHealth,
-  operationalRate = "93.1% Operational",
-  monitoredAssets = 248,
+  data,
+  monitoredAssets: monitoredAssetsProp,
   className = "",
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -98,13 +96,13 @@ export const DeviceHealthCard: React.FC<DeviceHealthCardProps> = ({
     ].join(" ");
   };
 
-  // Pre-calculate sectors with exact angles
-  let accumulatedAngle = 0;
-  const sectors = breakdown.map((item) => {
-    const startAngle = accumulatedAngle;
+  // Pre-calculate sectors with exact angles without mutating outer render variables
+  const sectors = breakdown.map((item, index) => {
+    const startAngle = breakdown
+      .slice(0, index)
+      .reduce((sum, prev) => sum + (prev.percentage / 100) * 360, 0);
     const sweepAngle = (item.percentage / 100) * 360;
-    const endAngle = accumulatedAngle + sweepAngle;
-    accumulatedAngle = endAngle;
+    const endAngle = startAngle + sweepAngle;
 
     return {
       ...item,
@@ -112,6 +110,26 @@ export const DeviceHealthCard: React.FC<DeviceHealthCardProps> = ({
       hoverPathData: describeDonutArc(center, center, rInner - 1, rOuter + 2, startAngle, endAngle),
     };
   });
+
+  const monitoredAssets = monitoredAssetsProp ?? data?.monitoredAssets ?? 261;
+  const operationalRate = data?.operationalRate ?? "98.2% Operational";
+
+  const renderCenterCount = () => {
+    if (activeItem) {
+      return activeItem.count;
+    }
+    if (!hasCountedUp) {
+      return (
+        <CountUp
+          value={totalCount}
+          duration={1300}
+          delay={100}
+          onComplete={() => setHasCountedUp(true)}
+        />
+      );
+    }
+    return totalCount;
+  };
 
   return (
     <div
@@ -140,7 +158,10 @@ export const DeviceHealthCard: React.FC<DeviceHealthCardProps> = ({
             <svg
               className="w-full h-full select-none"
               viewBox={`0 0 ${size} ${size}`}
+              role="img"
+              aria-label="Device Health Breakdown Donut Chart"
             >
+              <title>Device Health Breakdown Donut Chart</title>
               <defs>
                 <style>{`
                   @keyframes donutCompleteSweep {
@@ -200,18 +221,7 @@ export const DeviceHealthCard: React.FC<DeviceHealthCardProps> = ({
             {/* Center Content with single initial CountUp animation */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
               <span className="text-[28px] sm:text-[32px] font-bold text-[#0f172a] dark:text-white tracking-tight leading-none transition-all duration-150">
-                {activeItem ? (
-                  activeItem.count
-                ) : !hasCountedUp ? (
-                  <CountUp
-                    value={totalCount}
-                    duration={1300}
-                    delay={100}
-                    onComplete={() => setHasCountedUp(true)}
-                  />
-                ) : (
-                  totalCount
-                )}
+                {renderCenterCount()}
               </span>
               <span className="text-[11px] font-bold text-[#64748b] dark:text-slate-400 uppercase tracking-wider mt-1 transition-all duration-150">
                 {activeItem ? activeItem.label : "DEVICES"}

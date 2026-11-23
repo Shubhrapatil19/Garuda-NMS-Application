@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { toast } from "sonner";
+import { sanitizeApiError } from "@/utils/errorHandler";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -39,7 +40,7 @@ function ResetPasswordForm() {
     let score = 0;
     if (pass.length >= 8) score++;
     if (/[A-Z]/.test(pass)) score++;
-    if (/[0-9]/.test(pass)) score++;
+    if (/\d/.test(pass)) score++;
     if (/[^A-Za-z0-9]/.test(pass)) score++;
 
     if (score <= 1) return { score: 1, label: "Weak", color: "bg-rose-500" };
@@ -50,7 +51,17 @@ function ResetPasswordForm() {
 
   const strength = getPasswordStrength(newPassword);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const getConfirmPasswordBorderClass = () => {
+    if (!confirmPassword) {
+      return "border-[#182a47] focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20";
+    }
+    if (confirmPassword === newPassword) {
+      return "border-emerald-500/50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20";
+    }
+    return "border-rose-500/50 focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-500/20";
+  };
+
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -100,10 +111,10 @@ function ResetPasswordForm() {
         router.push("/login");
       }, 1500);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Failed to reset password. The link may have expired.";
+      const msg = sanitizeApiError(
+        err,
+        "Failed to reset password. The link may have expired."
+      );
       setErrorMsg(msg);
       toast.error("Reset Failed", { description: msg });
       setIsSubmitting(false);
@@ -175,12 +186,13 @@ function ResetPasswordForm() {
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
         {/* New Password */}
         <div>
-          <label className="block text-[11px] font-medium text-slate-300 mb-1.5">
+          <label htmlFor="reset-new-password" className="block text-[11px] font-medium text-slate-300 mb-1.5">
             New Password
           </label>
-          <div className="flex items-center rounded-xl bg-[#071120] border border-[#182a47] min-h-[44px] overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+          <div className="flex items-center rounded-xl bg-[#071120] border border-[#182a47] min-h-11 overflow-hidden transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
             <Lock className="ml-3.5 w-4 h-4 text-slate-400 shrink-0" />
             <input
+              id="reset-new-password"
               required
               type={showPassword ? "text" : "password"}
               value={newPassword}
@@ -219,20 +231,15 @@ function ResetPasswordForm() {
 
         {/* Confirm Password */}
         <div>
-          <label className="block text-[11px] font-medium text-slate-300 mb-1.5">
+          <label htmlFor="reset-confirm-password" className="block text-[11px] font-medium text-slate-300 mb-1.5">
             Confirm New Password
           </label>
           <div
-            className={`flex items-center rounded-xl bg-[#071120] border min-h-[44px] overflow-hidden transition-all ${
-              confirmPassword
-                ? confirmPassword === newPassword
-                  ? "border-emerald-500/50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20"
-                  : "border-rose-500/50 focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-500/20"
-                : "border-[#182a47] focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20"
-            }`}
+            className={`flex items-center rounded-xl bg-[#071120] border min-h-11 overflow-hidden transition-all ${getConfirmPasswordBorderClass()}`}
           >
             <KeyRound className="ml-3.5 w-4 h-4 text-slate-400 shrink-0" />
             <input
+              id="reset-confirm-password"
               required
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
@@ -303,8 +310,8 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen w-full bg-[#071120] text-slate-300 font-sans antialiased flex flex-col justify-between p-6 relative overflow-hidden">
       {/* Ambient background glows matching login */}
-      <div className="fixed top-10 left-[15%] w-96 h-96 rounded-full bg-blue-600/[0.08] blur-[140px] pointer-events-none" />
-      <div className="fixed bottom-10 right-[20%] w-96 h-96 rounded-full bg-cyan-500/[0.05] blur-[150px] pointer-events-none" />
+      <div className="fixed top-10 left-[15%] w-96 h-96 rounded-full bg-blue-600/8 blur-[140px] pointer-events-none" />
+      <div className="fixed bottom-10 right-[20%] w-96 h-96 rounded-full bg-cyan-500/5 blur-[150px] pointer-events-none" />
 
       <header className="relative z-10 flex items-center justify-between max-w-5xl w-full mx-auto">
         <GarudaLogo theme="dark" />

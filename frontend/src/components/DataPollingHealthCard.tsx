@@ -137,11 +137,11 @@ export const DataPollingHealthCard: React.FC<DataPollingHealthCardProps> = ({
 
   // Closed area polygon for gradient fill: start at bottom-left, points, down to bottom-right
   const firstCoord = coords[0];
-  const lastCoord = coords[coords.length - 1];
+  const lastCoord = coords.at(-1) ?? firstCoord;
   const areaPoints = `${firstCoord.x},${height} ${linePoints} ${lastCoord.x},${height}`;
 
   // Parse numeric average latency for CountUp
-  const avgLatencyNum = parseInt(averageLatency.replace(/[^0-9]/g, ""), 10) || 184;
+  const avgLatencyNum = Number.parseInt(averageLatency.replace(/\D/g, ""), 10) || 184;
 
   return (
     <div
@@ -266,7 +266,10 @@ export const DataPollingHealthCard: React.FC<DataPollingHealthCardProps> = ({
             viewBox={`0 0 ${width} ${height}`}
             className="w-full h-28 sm:h-32 overflow-visible"
             preserveAspectRatio="none"
+            role="img"
+            aria-label="Data Polling Health Trend Chart"
           >
+            <title>Data Polling Health Trend Chart</title>
             <defs>
               <style>{`
                 @keyframes drawTrendPath {
@@ -388,7 +391,8 @@ export const DataPollingHealthCard: React.FC<DataPollingHealthCardProps> = ({
             {/* Interactive Data Point Dots popping in sync as the line reaches each coordinate */}
             {coords.map((c) => {
               const isHovered = hoveredPoint?.index === c.index;
-              const xRatio = (c.x - coords[0].x) / (coords[coords.length - 1].x - coords[0].x);
+              const lastX = coords.at(-1)?.x ?? coords[0].x;
+              const xRatio = lastX !== coords[0].x ? (c.x - coords[0].x) / (lastX - coords[0].x) : 0;
               const dotDelay = Math.round(100 + xRatio * 1350);
 
               return (

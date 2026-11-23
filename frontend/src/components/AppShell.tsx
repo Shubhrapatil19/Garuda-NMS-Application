@@ -8,6 +8,7 @@ import { dashboardService } from "@/services/dashboardService";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import LogoutConfirmModal from "@/components/LogoutConfirmModal";
+import { OrbitLoader } from "@/components/Loader";
 import { toast } from "sonner";
 
 interface AppShellProps {
@@ -20,7 +21,7 @@ export default function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const { user, isAdmin } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,11 +37,6 @@ export default function AppShell({ children }: AppShellProps) {
     }
   }, [pathname, router]);
 
-  // Always reset logout modal state on route navigation or auth transitions
-  useEffect(() => {
-    setIsLogoutModalOpen(false);
-  }, [pathname]);
-
   // For authentication, reset-password and landing pages, render children directly without Shell
   const isAuthPage =
     !pathname ||
@@ -50,8 +46,54 @@ export default function AppShell({ children }: AppShellProps) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup");
 
+  // Persist last visited protected route for refresh restoration
+  useEffect(() => {
+    if (pathname && !isAuthPage && pathname !== "/") {
+      try {
+        localStorage.setItem("garuda_last_route", pathname);
+        document.cookie = `garuda_last_route=${encodeURIComponent(pathname)}; path=/; max-age=604800; SameSite=Lax`;
+      } catch {
+        // Ignore storage or cookie write errors
+      }
+    }
+  }, [pathname, isAuthPage]);
+
+  // Keep auth cookie synchronized whenever user is present
+  useEffect(() => {
+    if (user && typeof document !== "undefined" && !document.cookie.includes("garuda_auth_token=")) {
+      const token = user.token || localStorage.getItem("garuda_auth_token") || `mock-token-${user.id}`;
+      document.cookie = `garuda_auth_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
+    }
+  }, [user]);
+
+  // Redirect unauthenticated users away from protected routes immediately while keeping return target
+  useEffect(() => {
+    if (!loading && !user && !isAuthPage) {
+      const returnUrl = encodeURIComponent(pathname);
+      router.replace(`/login?callbackUrl=${returnUrl}`);
+    }
+  }, [loading, user, isAuthPage, pathname, router]);
+
   if (isAuthPage) {
     return <>{children}</>;
+  }
+
+  // If checking authentication state, show clean loader
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#f3f6fb] dark:bg-[#060b13]">
+        <OrbitLoader compact={false} text="Authenticating Session..." subtext="Verifying network access permissions" />
+      </div>
+    );
+  }
+
+  // If unauthenticated on protected route, block render and wait for redirect
+  if (!user) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#f3f6fb] dark:bg-[#060b13]">
+        <OrbitLoader compact={false} text="Authentication Required" subtext="Redirecting to secure login portal..." />
+      </div>
+    );
   }
 
   // Determine active tab from URL path (normalizing spaces and encoded entities)

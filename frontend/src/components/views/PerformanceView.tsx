@@ -1,29 +1,47 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   RefreshCw,
   ChevronDown,
   Search,
-  Cpu,
-  HardDrive,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  Wifi,
-  Server,
-  Zap,
-  ArrowRight,
   X,
-  Radio,
-  Activity,
-  Layers,
-  SlidersHorizontal,
-  FileText,
 } from "lucide-react";
 import { CARRIER_SITES, CarrierSite, SiteCircuit } from "@/data/sitesData";
+import cpeInventoryData from "@/data/cpeInventory.json";
+
+const getCpeStatusBadgeClass = (status: "online" | "warning" | "offline") => {
+  if (status === "online") {
+    return "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60";
+  }
+  if (status === "warning") {
+    return "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60";
+  }
+  return "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60";
+};
+
+const getCpeStatusDotClass = (status: string) => {
+  if (status === "online") return "bg-emerald-500";
+  if (status === "warning") return "bg-amber-500";
+  return "bg-rose-500";
+};
+
+const getCpuProgressColor = (cpu: number) => {
+  if (cpu > 80) return "bg-rose-500";
+  if (cpu > 60) return "bg-amber-500";
+  return "bg-blue-600";
+};
+
+const getSlaStatusBadgeClass = (status: "healthy" | "warning" | "breached") => {
+  if (status === "healthy") {
+    return "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60";
+  }
+  if (status === "warning") {
+    return "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60";
+  }
+  return "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60";
+};
 
 type TabType = "bandwidth" | "cpe" | "sla";
 
@@ -123,8 +141,8 @@ export default function PerformanceView() {
   // Parse numeric CIR limit from configuredCIR (e.g., "6 Mbps" -> 6.0)
   const cirLimit = useMemo(() => {
     const raw = selectedCircuit?.configuredCIR || "6 Mbps";
-    const num = parseFloat(raw);
-    return isNaN(num) || num <= 0 ? 6.0 : num;
+    const num = Number.parseFloat(raw);
+    return Number.isNaN(num) || num <= 0 ? 6.0 : num;
   }, [selectedCircuit]);
 
   // Handle Refresh simulation
@@ -155,143 +173,7 @@ export default function PerformanceView() {
 
   // Full 9 CPEs Dataset matching CARRIER_SITES and user screenshot
   const cpeInventoryList: CpeInventoryItem[] = useMemo(() => {
-    return [
-      {
-        name: "TAH-IND-MUMBAI-003-R-01",
-        deviceId: "DEV-CPE-09101",
-        associatedSite: "West-MH03-Mumbai",
-        siteId: "west-mh03-mumbai",
-        region: "Maharashtra",
-        ipAddress: "121.244.104.198",
-        underlay: "TCL-INET1 / TCL-MPLS1",
-        status: "online",
-        cpu: 34,
-        memory: 52,
-        lastSeen: "10s ago",
-        model: "Fortinet FortiGate 60F",
-        temperature: "34.5 °C",
-      },
-      {
-        name: "TAH-IND-PUNE-005-R-01",
-        deviceId: "DEV-CPE-09102",
-        associatedSite: "West-MH05-Pune",
-        siteId: "west-mh05-pune",
-        region: "Maharashtra",
-        ipAddress: "121.244.112.50",
-        underlay: "TCL-INET1 / TCL-MPLS1",
-        status: "online",
-        cpu: 28,
-        memory: 46,
-        lastSeen: "25s ago",
-        model: "Cisco Catalyst 8300",
-        temperature: "36.2 °C",
-      },
-      {
-        name: "TAH-IND-NAGPUR-007-R-01",
-        deviceId: "DEV-CPE-09103",
-        associatedSite: "West-MH07-Nagpur",
-        siteId: "west-mh07-nagpur",
-        region: "Maharashtra",
-        ipAddress: "121.244.180.12",
-        underlay: "TCL-INET1",
-        status: "warning",
-        cpu: 82,
-        memory: 88,
-        lastSeen: "40s ago",
-        model: "Fortinet FortiGate 80F",
-        temperature: "44.8 °C",
-      },
-      {
-        name: "TAH-IND-NASHIK-009-R-01",
-        deviceId: "DEV-CPE-09104",
-        associatedSite: "West-MH09-Nashik",
-        siteId: "west-mh09-nashik",
-        region: "Maharashtra",
-        ipAddress: "121.244.135.22",
-        underlay: "TCL-INET1 / TCL-MPLS1",
-        status: "online",
-        cpu: 31,
-        memory: 48,
-        lastSeen: "12s ago",
-        model: "Cisco Catalyst 1000",
-        temperature: "33.1 °C",
-      },
-      {
-        name: "TAH-IND-AHM-003-R-01",
-        deviceId: "DEV-CPE-09105",
-        associatedSite: "West-GJ03-Ahmedabad",
-        siteId: "west-gj03-ahmedabad",
-        region: "Gujarat",
-        ipAddress: "121.244.150.88",
-        underlay: "TCL-INET1 / TCL-MPLS1",
-        status: "online",
-        cpu: 42,
-        memory: 55,
-        lastSeen: "18s ago",
-        model: "Fortinet FortiGate 100F",
-        temperature: "37.4 °C",
-      },
-      {
-        name: "TAH-IND-SURAT-005-R-01",
-        deviceId: "DEV-CPE-09106",
-        associatedSite: "West-GJ05-Surat",
-        siteId: "west-gj05-surat",
-        region: "Gujarat",
-        ipAddress: "121.244.162.40",
-        underlay: "TCL-INET1 / TCL-MPLS1",
-        status: "online",
-        cpu: 38,
-        memory: 49,
-        lastSeen: "30s ago",
-        model: "Cisco Catalyst 8200",
-        temperature: "35.8 °C",
-      },
-      {
-        name: "TAH-IND-VAD-007-R-01",
-        deviceId: "DEV-CPE-09107",
-        associatedSite: "West-GJ07-Vadodara",
-        siteId: "west-gj07-vadodara",
-        region: "Gujarat",
-        ipAddress: "121.244.175.90",
-        underlay: "TCL-INET1",
-        status: "warning",
-        cpu: 79,
-        memory: 84,
-        lastSeen: "55s ago",
-        model: "Fortinet FortiGate 60F",
-        temperature: "43.5 °C",
-      },
-      {
-        name: "TAH-IND-RAJ-009-R-01",
-        deviceId: "DEV-CPE-09108",
-        associatedSite: "West-GJ09-Rajkot",
-        siteId: "west-gj09-rajkot",
-        region: "Gujarat",
-        ipAddress: "121.244.192.14",
-        underlay: "TCL-INET1",
-        status: "offline",
-        cpu: 0,
-        memory: 0,
-        lastSeen: "18m ago",
-        model: "Cisco ISR 4331",
-        temperature: "N/A",
-      },
-      {
-        name: "TAH-IND-JAI-003-R-01",
-        deviceId: "DEV-CPE-09109",
-        associatedSite: "North-RJ03-Jaipur",
-        siteId: "north-rj03-jaipur",
-        region: "Rajasthan",
-        ipAddress: "121.244.205.66",
-        underlay: "TCL-INET1 / TCL-MPLS1",
-        status: "online",
-        cpu: 36,
-        memory: 50,
-        lastSeen: "8s ago",
-        model: "Fortinet FortiGate 60F",
-        temperature: "35.0 °C",
-      },
-    ];
+    return cpeInventoryData as CpeInventoryItem[];
   }, []);
 
   // Filtered CPE Inventory List
@@ -463,26 +345,32 @@ export default function PerformanceView() {
   const chartAreaWidth = svgWidth - paddingLeft - paddingRight;
   const chartAreaHeight = svgHeight - paddingTop - paddingBottom;
 
-  const getX = (index: number) => {
-    return paddingLeft + (index / (telemetryData.length - 1)) * chartAreaWidth;
-  };
+  const getX = useCallback(
+    (index: number) => {
+      return paddingLeft + (index / (telemetryData.length - 1)) * chartAreaWidth;
+    },
+    [chartAreaWidth, telemetryData.length]
+  );
 
-  const getY = (val: number) => {
-    const clamped = Math.max(0, Math.min(cirLimit, val));
-    return paddingTop + chartAreaHeight - (clamped / cirLimit) * chartAreaHeight;
-  };
+  const getY = useCallback(
+    (val: number) => {
+      const clamped = Math.max(0, Math.min(cirLimit, val));
+      return paddingTop + chartAreaHeight - (clamped / cirLimit) * chartAreaHeight;
+    },
+    [chartAreaHeight, cirLimit]
+  );
 
   const rxPath = useMemo(() => {
     return telemetryData
       .map((pt, i) => `${i === 0 ? "M" : "L"} ${getX(i).toFixed(1)} ${getY(pt.rx).toFixed(1)}`)
       .join(" ");
-  }, [telemetryData, cirLimit]);
+  }, [telemetryData, getX, getY]);
 
   const txPath = useMemo(() => {
     return telemetryData
       .map((pt, i) => `${i === 0 ? "M" : "L"} ${getX(i).toFixed(1)} ${getY(pt.tx).toFixed(1)}`)
       .join(" ");
-  }, [telemetryData, cirLimit]);
+  }, [telemetryData, getX, getY]);
 
   const yTicks = [
     { label: `${cirLimit.toFixed(0)}M (100%)`, val: cirLimit, isLimit: true },
@@ -563,11 +451,15 @@ export default function PerformanceView() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
               {/* Site Filter Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                <label
+                  htmlFor="bandwidth-site-filter"
+                  className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase"
+                >
                   SITE FILTER
                 </label>
                 <div className="relative">
                   <select
+                    id="bandwidth-site-filter"
                     value={selectedSiteId}
                     onChange={(e) => {
                       setSelectedSiteId(e.target.value);
@@ -593,11 +485,15 @@ export default function PerformanceView() {
 
               {/* Device / Underlay Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                <label
+                  htmlFor="bandwidth-circuit-filter"
+                  className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase"
+                >
                   DEVICE / UNDERLAY
                 </label>
                 <div className="relative">
                   <select
+                    id="bandwidth-circuit-filter"
                     value={selectedCircuitName}
                     onChange={(e) => setSelectedCircuitName(e.target.value)}
                     className="appearance-none w-full sm:w-64 bg-white dark:bg-[#0b1728] border border-slate-200 dark:border-[#1e324d] rounded-xl px-3.5 py-2 pr-9 text-xs sm:text-sm font-semibold text-slate-800 dark:text-white shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
@@ -619,11 +515,15 @@ export default function PerformanceView() {
             {/* Right Side: Time Range & Refresh Button */}
             <div className="flex items-end sm:items-center gap-3 self-end md:self-auto">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                <label
+                  htmlFor="bandwidth-time-range"
+                  className="text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase"
+                >
                   TIME RANGE
                 </label>
                 <div className="relative">
                   <select
+                    id="bandwidth-time-range"
                     value={selectedTimeRange}
                     onChange={(e) => setSelectedTimeRange(e.target.value)}
                     className="appearance-none bg-white dark:bg-[#0b1728] border border-slate-200 dark:border-[#1e324d] rounded-xl px-3.5 py-2 pr-9 text-xs sm:text-sm font-semibold text-slate-800 dark:text-white shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
@@ -679,7 +579,7 @@ export default function PerformanceView() {
             {/* Online Traffic Flow Status Badge */}
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Online Traffic Flow
+              <span>Online Traffic Flow</span>
             </span>
           </div>
 
@@ -720,10 +620,13 @@ export default function PerformanceView() {
             {/* SVG Telemetry Canvas */}
             <div className="relative w-full overflow-x-auto">
               <svg
+                role="img"
+                aria-label="Bandwidth Telemetry Chart"
                 viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                className="w-full h-auto min-w-[700px] overflow-visible select-none"
+                className="w-full h-auto min-w-175 overflow-visible select-none"
                 onMouseLeave={() => setHoveredPointIndex(null)}
               >
+                <title>Bandwidth Telemetry Chart</title>
                 {/* Horizontal Grid lines */}
                 {yTicks.map((tick) => {
                   const yPos = getY(tick.val);
@@ -821,7 +724,7 @@ export default function PerformanceView() {
                   const cx = getX(i);
                   const isHovered = hoveredPointIndex === i;
                   return (
-                    <g key={`markers-${i}`}>
+                    <g key={`markers-${pt.time}`}>
                       <circle
                         cx={cx}
                         cy={getY(pt.rx)}
@@ -863,7 +766,7 @@ export default function PerformanceView() {
                   const w = chartAreaWidth / (telemetryData.length - 1);
                   return (
                     <rect
-                      key={`hitbox-${i}`}
+                      key={`hitbox-${pt.time}`}
                       x={Math.max(paddingLeft, x)}
                       y={paddingTop}
                       width={w}
@@ -901,7 +804,7 @@ export default function PerformanceView() {
                     <div className="flex items-center justify-between text-blue-300">
                       <span className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        Rx Receive:
+                        <span>Rx Receive:</span>
                       </span>
                       <span className="font-bold">
                         {telemetryData[hoveredPointIndex].rx.toFixed(2)} Mbps
@@ -911,7 +814,7 @@ export default function PerformanceView() {
                     <div className="flex items-center justify-between text-emerald-300">
                       <span className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        Tx Transmit:
+                        <span>Tx Transmit:</span>
                       </span>
                       <span className="font-bold">
                         {telemetryData[hoveredPointIndex].tx.toFixed(2)} Mbps
@@ -1003,7 +906,13 @@ export default function PerformanceView() {
 
                 <div className="flex items-center justify-center gap-8 py-5">
                   <div className="relative w-36 h-36 flex items-center justify-center">
-                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    <svg
+                      role="img"
+                      aria-label="Overall availability gauge chart"
+                      viewBox="0 0 100 100"
+                      className="w-full h-full -rotate-90"
+                    >
+                      <title>Overall availability gauge chart</title>
                       <circle
                         cx="50"
                         cy="50"
@@ -1088,7 +997,13 @@ export default function PerformanceView() {
                 </p>
 
                 <div className="py-6">
-                  <svg viewBox="0 0 500 120" className="w-full h-32 overflow-visible select-none">
+                  <svg
+                    role="img"
+                    aria-label="Fleet health trend curve"
+                    viewBox="0 0 500 120"
+                    className="w-full h-32 overflow-visible select-none"
+                  >
+                    <title>Fleet health trend curve</title>
                     <line x1="0" y1="20" x2="500" y2="20" stroke="rgba(241, 245, 249, 0.6)" className="dark:stroke-[#15233b]" strokeDasharray="4 4" strokeWidth="1" />
                     <line x1="0" y1="60" x2="500" y2="60" stroke="rgba(241, 245, 249, 0.6)" className="dark:stroke-[#15233b]" strokeDasharray="4 4" strokeWidth="1" />
                     <line x1="0" y1="100" x2="500" y2="100" stroke="rgba(241, 245, 249, 0.6)" className="dark:stroke-[#15233b]" strokeDasharray="4 4" strokeWidth="1" />
@@ -1122,11 +1037,11 @@ export default function PerformanceView() {
               <div className="border-t border-slate-100 dark:border-[#14233a] pt-3 flex items-center gap-6 text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Online CPEs Stable
+                  <span>Online CPEs Stable</span>
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  2 Warning Devices Recovering
+                  <span>2 Warning Devices Recovering</span>
                 </span>
               </div>
             </div>
@@ -1239,13 +1154,9 @@ export default function PerformanceView() {
                       </td>
                       <td className="py-3.5 px-3">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                            cpe.status === "online"
-                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60"
-                              : cpe.status === "warning"
-                              ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60"
-                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getCpeStatusBadgeClass(
+                            cpe.status
+                          )}`}
                         >
                           {cpe.status.charAt(0).toUpperCase() + cpe.status.slice(1)}
                         </span>
@@ -1372,7 +1283,13 @@ export default function PerformanceView() {
 
                 {/* SVG Curve */}
                 <div className="py-6">
-                  <svg viewBox="0 0 320 120" className="w-full h-32 overflow-visible select-none">
+                  <svg
+                    role="img"
+                    aria-label="Target threshold curve"
+                    viewBox="0 0 320 120"
+                    className="w-full h-32 overflow-visible select-none"
+                  >
+                    <title>Target threshold curve</title>
                     {/* Target reference dashed line at 99.5% */}
                     <line
                       x1="0"
@@ -1428,7 +1345,13 @@ export default function PerformanceView() {
 
                 {/* SVG Curves */}
                 <div className="py-6">
-                  <svg viewBox="0 0 320 120" className="w-full h-32 overflow-visible select-none">
+                  <svg
+                    role="img"
+                    aria-label="Latency and jitter telemetry curve"
+                    viewBox="0 0 320 120"
+                    className="w-full h-32 overflow-visible select-none"
+                  >
+                    <title>Latency and jitter telemetry curve</title>
                     {/* Blue Latency Wave */}
                     <path
                       d="M 0,55 C 50,45 100,52 160,58 C 220,64 260,58 320,38"
@@ -1461,11 +1384,11 @@ export default function PerformanceView() {
               <div className="border-t border-slate-100 dark:border-[#14233a] pt-3 flex items-center gap-5 text-xs font-medium">
                 <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  Latency: 24.6 ms
+                  <span>Latency: 24.6 ms</span>
                 </span>
                 <span className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-purple-500" />
-                  Jitter: 1.8 ms
+                  <span>Jitter: 1.8 ms</span>
                 </span>
               </div>
             </div>
@@ -1482,7 +1405,13 @@ export default function PerformanceView() {
 
                 {/* SVG Curve with distinct poll spike */}
                 <div className="py-6">
-                  <svg viewBox="0 0 320 120" className="w-full h-32 overflow-visible select-none">
+                  <svg
+                    role="img"
+                    aria-label="Packet loss telemetry curve"
+                    viewBox="0 0 320 120"
+                    className="w-full h-32 overflow-visible select-none"
+                  >
+                    <title>Packet loss telemetry curve</title>
                     {/* Baseline Line with triangular spike at ~08:30 */}
                     <path
                       d="M 0,98 L 175,98 L 195,62 L 215,98 L 320,98"
@@ -1632,13 +1561,9 @@ export default function PerformanceView() {
                         {/* SLA Status Badge */}
                         <td className="py-3.5 px-3">
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                              service.slaStatus === "healthy"
-                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60"
-                                : service.slaStatus === "warning"
-                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-800/60"
-                                : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/60"
-                            }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getSlaStatusBadgeClass(
+                              service.slaStatus
+                            )}`}
                           >
                             {service.slaStatus.charAt(0).toUpperCase() + service.slaStatus.slice(1)}
                           </span>
@@ -1665,7 +1590,6 @@ export default function PerformanceView() {
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end animate-fade-in">
           <div
             className="w-full max-w-md bg-white dark:bg-[#07111e] border-l border-slate-200 dark:border-[#14233a] h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-slide-left p-6 space-y-6"
-            onClick={(e) => e.stopPropagation()}
           >
             <div>
               <div className="flex items-start justify-between border-b border-slate-100 dark:border-[#14233a] pb-4">
@@ -1777,7 +1701,6 @@ export default function PerformanceView() {
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end animate-fade-in">
           <div
             className="w-full max-w-md bg-white dark:bg-[#07111e] border-l border-slate-200 dark:border-[#14233a] h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-slide-left p-6 space-y-6"
-            onClick={(e) => e.stopPropagation()}
           >
             <div>
               <div className="flex items-start justify-between border-b border-slate-100 dark:border-[#14233a] pb-4">
@@ -1808,22 +1731,14 @@ export default function PerformanceView() {
                     CURRENT STATE
                   </span>
                   <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold mt-1 ${
-                      selectedCpeForDrawer.status === "online"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : selectedCpeForDrawer.status === "warning"
-                        ? "bg-amber-50 text-amber-700 border border-amber-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200"
-                    }`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold mt-1 ${getCpeStatusBadgeClass(
+                      selectedCpeForDrawer.status
+                    )}`}
                   >
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        selectedCpeForDrawer.status === "online"
-                          ? "bg-emerald-500"
-                          : selectedCpeForDrawer.status === "warning"
-                          ? "bg-amber-500"
-                          : "bg-rose-500"
-                      }`}
+                      className={`w-1.5 h-1.5 rounded-full ${getCpeStatusDotClass(
+                        selectedCpeForDrawer.status
+                      )}`}
                     />
                     {selectedCpeForDrawer.status.toUpperCase()}
                   </span>
@@ -1853,13 +1768,9 @@ export default function PerformanceView() {
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        selectedCpeForDrawer.cpu > 80
-                          ? "bg-rose-500"
-                          : selectedCpeForDrawer.cpu > 60
-                          ? "bg-amber-500"
-                          : "bg-blue-600"
-                      }`}
+                      className={`h-full rounded-full transition-all ${getCpuProgressColor(
+                        selectedCpeForDrawer.cpu
+                      )}`}
                       style={{ width: `${selectedCpeForDrawer.cpu}%` }}
                     />
                   </div>

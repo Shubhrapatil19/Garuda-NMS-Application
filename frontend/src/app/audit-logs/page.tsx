@@ -1,20 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
-  ShieldCheck,
   ShieldAlert,
   Search,
-  Filter,
   ArrowLeft,
-  Clock,
-  Terminal,
-  Activity,
-  UserCheck,
-  Lock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import sampleLogsData from "@/data/auditLogs.json";
 
 interface AuditEvent {
   id: string;
@@ -27,68 +21,17 @@ interface AuditEvent {
   ip: string;
 }
 
-const SAMPLE_LOGS: AuditEvent[] = [
-  {
-    id: "aud-001",
-    timestamp: "2 mins ago",
-    actor: "Jayesh Nikumbh",
-    role: "Network Engineer",
-    action: "ICMP Diagnostic Ping",
-    target: "Core-Router-01 (10.24.1.1)",
-    severity: "info",
-    ip: "10.200.4.15",
-  },
-  {
-    id: "aud-002",
-    timestamp: "14 mins ago",
-    actor: "System Administrator",
-    role: "Administrator",
-    action: "Update SNMP Timeout",
-    target: "Olio Poller Global Engine",
-    severity: "warning",
-    ip: "10.200.1.2",
-  },
-  {
-    id: "aud-003",
-    timestamp: "45 mins ago",
-    actor: "Jayesh Nikumbh",
-    role: "Network Engineer",
-    action: "Acknowledge Incident",
-    target: "Incident ALT-104 (BOM-Switch-44)",
-    severity: "info",
-    ip: "10.200.4.15",
-  },
-  {
-    id: "aud-004",
-    timestamp: "1 hour ago",
-    actor: "System Administrator",
-    role: "Administrator",
-    action: "Onboard Network Device",
-    target: "DEL-EDGE-NEW-001 (10.20.4.61)",
-    severity: "info",
-    ip: "10.200.1.2",
-  },
-  {
-    id: "aud-005",
-    timestamp: "2 hours ago",
-    actor: "System Administrator",
-    role: "Administrator",
-    action: "Slack Webhook Reconfiguration",
-    target: "#tah-noc-triage Channel",
-    severity: "warning",
-    ip: "10.200.1.2",
-  },
-  {
-    id: "aud-006",
-    timestamp: "3 hours ago",
-    actor: "Jayesh Nikumbh",
-    role: "Network Engineer",
-    action: "User Authentication",
-    target: "Web Console Session",
-    severity: "info",
-    ip: "10.200.4.15",
-  },
-];
+const SAMPLE_LOGS: AuditEvent[] = sampleLogsData as AuditEvent[];
+
+const getSeverityBadgeClass = (severity: AuditEvent["severity"]) => {
+  if (severity === "warning") {
+    return "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800";
+  }
+  if (severity === "critical") {
+    return "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800";
+  }
+  return "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800";
+};
 
 export default function AuditLogsPage() {
   const { user, isAdmin } = useAuth();
@@ -205,13 +148,9 @@ export default function AuditLogsPage() {
 
                   <td className="py-3.5 px-5">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                        log.severity === "warning"
-                          ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                          : log.severity === "critical"
-                          ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                          : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                      }`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${getSeverityBadgeClass(
+                        log.severity
+                      )}`}
                     >
                       {log.action}
                     </span>
