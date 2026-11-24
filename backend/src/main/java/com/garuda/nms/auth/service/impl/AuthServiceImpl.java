@@ -52,7 +52,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${garuda.oauth.google.client-secret:}")
     private String googleClientSecret;
-
+    @Value("${garuda.app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
     private final RestClient restClient = RestClient.create();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -432,7 +433,7 @@ public class AuthServiceImpl implements AuthService {
         userRepository.saveOtpNative(email, resetToken, "PASSWORD_RESET");
 
         // 4. Construct frontend redirect URL
-        String resetUrl = "http://localhost:3000/reset-password?token=" + resetToken;
+        String resetUrl = frontendUrl + "/reset-password?token=" + resetToken;
 
         System.out.println("==================================================");
         System.out.println(">>> GARUDA NMS PASSWORD RESET LINK <<<");
@@ -449,9 +450,7 @@ public class AuthServiceImpl implements AuthService {
                         "<div style='text-align:center;margin:28px 0;'>" +
                         "<a href='" + resetUrl + "' style='background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;box-shadow:0 4px 6px -1px rgba(37,99,235,0.2);'>Reset Password</a>" +
                         "</div>" +
-                        "<p style='color:#64748b;font-size:13px;'>If the button doesn't work, you can copy and paste this link in your browser:</p>" +
-                        "<p style='color:#2563eb;font-size:12px;word-break:break-all;'>" + resetUrl + "</p>" +
-                        "<p style='color:#64748b;font-size:13px;margin-top:16px;'>This link is valid for 15 minutes. If you did not make this request, you can safely ignore this email.</p>"
+                        "<p style='color:#64748b;font-size:13px;margin-top:16px;'>This button is valid for 15 minutes. If you did not make this request, you can safely ignore this email.</p>"
         );
     }
 
