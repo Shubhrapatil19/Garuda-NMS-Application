@@ -21,10 +21,10 @@ public class OpenApiConfig {
                         .title("Garuda NMS - Authentication & Security APIs")
                         .version("1.0.0")
                         .description("Production-ready Enterprise Authentication Module for Garuda Network Management System"))
-                // Relative URL "/" ensures Swagger always uses HTTPS on Ngrok
                 .servers(List.of(
+                        new Server().url("https://garuda-nms.duckdns.org").description("Production Server (DuckDNS HTTPS)"),
                         new Server().url("http://localhost:8080").description("Local Development Server (Port 8080)"),
-                        new Server().url("https://tinsmith-clamp-oversight.ngrok-free.dev").description("Remote Ngrok Server")
+                        new Server().url("/").description("Current Server (Auto)")
                 ))
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
                 .components(new io.swagger.v3.oas.models.Components()
