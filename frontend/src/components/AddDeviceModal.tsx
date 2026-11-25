@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import onboardingData from "../data/onboardingDefaults.json";
+import { deviceService, ConnectionTestResult } from "@/services/deviceService";
 
 export type NewDeviceData = typeof onboardingData.defaultNewDevice;
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -652,6 +653,8 @@ interface Step4Props {
   device: NewDeviceData;
   isDiagnosticRunning: boolean;
   diagnosticCompleted: boolean;
+  diagnosticResult: ConnectionTestResult | null;
+  diagnosticError: string | null;
   onRunTest: () => void;
   slideDirection: "forward" | "backward";
 }
@@ -659,9 +662,11 @@ interface Step4Props {
 function renderDiagnosticDetails(
   device: NewDeviceData,
   isDiagnosticRunning: boolean,
-  diagnosticCompleted: boolean
+  diagnosticCompleted: boolean,
+  diagnosticResult: ConnectionTestResult | null,
+  diagnosticError: string | null
 ) {
-  if (!diagnosticCompleted && !isDiagnosticRunning) {
+  if (!diagnosticCompleted && !isDiagnosticRunning && !diagnosticError) {
     return (
       <div className="text-sky-400 font-mono text-xs sm:text-[13px] font-medium">
         Ready. Run the check to validate device connectivity ({device.ip}).
@@ -676,48 +681,73 @@ function renderDiagnosticDetails(
       </div>
     );
   }
+  if (diagnosticError) {
+    return (
+      <div className="space-y-2 text-rose-400 font-mono text-xs sm:text-[13px]">
+        <div className="font-semibold">✗ Handshake probe failed</div>
+        <div className="text-slate-300">{diagnosticError}</div>
+      </div>
+    );
+  }
+
+  const reachable = diagnosticResult?.success ?? true;
+  const rtt = diagnosticResult?.rtt || "14 ms";
+  const oemDetected = diagnosticResult?.oemDetected || device.vendor;
+  const osVersion = diagnosticResult?.osVersion || `${device.vendor} Enterprise OS`;
+  const statusMsg = diagnosticResult?.message || "Pre-flight check completed successfully.";
+
   return (
     <div className="space-y-3.5 sm:space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6">
         <div className="w-56 shrink-0 flex items-center gap-2.5 text-white font-medium">
-          <span className="text-emerald-400 font-bold">✓</span>
-          <span>ICMP Reachable</span>
+          <span className={reachable ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+            {reachable ? "✓" : "✗"}
+          </span>
+          <span>{reachable ? "ICMP Reachable" : "ICMP Unreachable"}</span>
         </div>
         <div className="flex items-center gap-6 text-slate-300">
-          <span>RTT 14ms</span>
-          <span>Packet loss 0%</span>
+          <span>RTT {rtt}</span>
+          <span>Packet loss {reachable ? "0%" : "100%"}</span>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6">
         <div className="w-56 shrink-0 flex items-center gap-2.5 text-white font-medium">
-          <span className="text-emerald-400 font-bold">✓</span>
-          <span>UDP/{device.port || 161} Available</span>
+          <span className={reachable ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+            {reachable ? "✓" : "✗"}
+          </span>
+          <span>UDP/{device.port || 161} {reachable ? "Available" : "Closed"}</span>
         </div>
-        <div className="text-slate-300">Response 22ms</div>
+        <div className="text-slate-300">Response {rtt}</div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6">
         <div className="w-56 shrink-0 flex items-center gap-2.5 text-white font-medium">
-          <span className="text-emerald-400 font-bold">✓</span>
-          <span>Community Validated</span>
+          <span className={reachable ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
+            {reachable ? "✓" : "!"}
+          </span>
+          <span>{reachable ? "Community Validated" : "Pending Validation"}</span>
         </div>
-        <div className="text-slate-300">Read access granted</div>
+        <div className="text-slate-300">
+          {reachable ? "Read access granted" : "Verify target IP and credentials"}
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6">
         <div className="w-56 shrink-0 flex items-center gap-2.5 text-white font-medium">
-          <span className="text-emerald-400 font-bold">✓</span>
+          <span className={reachable ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
+            {reachable ? "✓" : "!"}
+          </span>
           <span>MIB-II Query</span>
         </div>
         <div className="space-y-1 text-slate-300">
           <div>SysName: {device.name || "TAH-IND-DELHI-001"}</div>
-          <div>SysDescr: {device.vendor} FortiOS v7.2.4</div>
+          <div>SysDescr: {oemDetected} {osVersion}</div>
         </div>
       </div>
 
       <div className="pt-2 text-slate-400">
-        Pre-flight check completed successfully.
+        {statusMsg}
       </div>
     </div>
   );
@@ -727,16 +757,22 @@ const Step4Diagnostic: React.FC<Step4Props> = ({
   device,
   isDiagnosticRunning,
   diagnosticCompleted,
+  diagnosticResult,
+  diagnosticError,
   onRunTest,
   slideDirection,
 }) => {
   const getTestButtonText = () => {
     if (isDiagnosticRunning) return "Running...";
-    if (diagnosticCompleted) return "Run Again";
+    if (diagnosticCompleted || diagnosticError) return "Run Again";
     return "Run Check";
   };
 
-  const diagnosticStatusText = isDiagnosticRunning ? "RUNNING CHECKS..." : "ALL CHECKS PASSED";
+  const diagnosticStatusText = isDiagnosticRunning
+    ? "RUNNING CHECKS..."
+    : diagnosticResult?.success === false || diagnosticError
+    ? "HANDSHAKE WARNING"
+    : "ALL CHECKS PASSED";
 
   return (
     <div
@@ -781,15 +817,27 @@ const Step4Diagnostic: React.FC<Step4Props> = ({
               CONNECTIVITY TEST
             </span>
           </div>
-          {diagnosticCompleted && (
-            <div className="text-[11px] font-semibold tracking-wider text-[#10b981]">
+          {(diagnosticCompleted || diagnosticError) && (
+            <div
+              className={`text-[11px] font-semibold tracking-wider ${
+                diagnosticResult?.success === false || diagnosticError
+                  ? "text-amber-400"
+                  : "text-[#10b981]"
+              }`}
+            >
               {diagnosticStatusText}
             </div>
           )}
         </div>
 
         <div className="p-5 sm:p-6 leading-relaxed flex-1 overflow-y-auto">
-          {renderDiagnosticDetails(device, isDiagnosticRunning, diagnosticCompleted)}
+          {renderDiagnosticDetails(
+            device,
+            isDiagnosticRunning,
+            diagnosticCompleted,
+            diagnosticResult,
+            diagnosticError
+          )}
         </div>
       </div>
     </div>
@@ -801,7 +849,7 @@ export interface AddDeviceModalProps {
   isRendered: boolean;
   isVisible: boolean;
   onClose: () => void;
-  onSave: (device: NewDeviceData) => void;
+  onSave: (device: NewDeviceData) => Promise<void> | void;
 }
 
 export const AddDeviceModal: React.FC<Readonly<AddDeviceModalProps>> = ({
@@ -818,24 +866,57 @@ export const AddDeviceModal: React.FC<Readonly<AddDeviceModalProps>> = ({
   );
   const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
   const [diagnosticCompleted, setDiagnosticCompleted] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<ConnectionTestResult | null>(null);
+  const [diagnosticError, setDiagnosticError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const changeStep = (targetStep: WizardStep) => {
     setSlideDirection(targetStep >= wizardStep ? "forward" : "backward");
     setWizardStep(targetStep);
   };
 
-  const runDiagnosticTest = () => {
-    setIsDiagnosticRunning(true);
-    setTimeout(() => {
-      setIsDiagnosticRunning(false);
-      setDiagnosticCompleted(true);
-      toast.success("Pre-flight checks passed", {
-        description: `Successfully reached ${newDevice.ip} via ${newDevice.protocol}.`,
+  const runDiagnosticTest = async () => {
+    if (!newDevice.ip.trim()) {
+      toast.error("Validation error", {
+        description: "Management IP address is required to run the connectivity test.",
       });
-    }, 700);
+      return;
+    }
+
+    setIsDiagnosticRunning(true);
+    setDiagnosticError(null);
+    try {
+      const result = await deviceService.testConnection({
+        ip: newDevice.ip.trim(),
+        port: Number.parseInt(newDevice.port, 10) || 161,
+        protocol: newDevice.protocol || "SSH / SNMP",
+        oem: newDevice.vendor || "Cisco",
+      });
+
+      setDiagnosticResult(result);
+      setDiagnosticCompleted(true);
+
+      if (result.success) {
+        toast.success("Pre-flight checks passed", {
+          description: `${result.message} (RTT: ${result.rtt})`,
+        });
+      } else {
+        toast.warning("Connection Handshake Warning", {
+          description: result.message || `Target ${newDevice.ip} did not respond.`,
+        });
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to run connection handshake test.";
+      setDiagnosticError(msg);
+      setDiagnosticCompleted(false);
+      toast.error("Connectivity Test Failed", { description: msg });
+    } finally {
+      setIsDiagnosticRunning(false);
+    }
   };
 
-  const handleNextOrSave = () => {
+  const handleNextOrSave = async () => {
     if (!newDevice.name.trim() || !newDevice.ip.trim()) {
       toast.error("Validation error", {
         description: "Device Name and Management IP are required.",
@@ -845,7 +926,19 @@ export const AddDeviceModal: React.FC<Readonly<AddDeviceModalProps>> = ({
     if (wizardStep < 4) {
       changeStep((wizardStep + 1) as WizardStep);
     } else {
-      onSave(newDevice);
+      setIsSaving(true);
+      try {
+        await onSave(newDevice);
+        setWizardStep(1);
+        setDiagnosticCompleted(false);
+        setDiagnosticResult(null);
+        setDiagnosticError(null);
+        setNewDevice(onboardingData.defaultNewDevice);
+      } catch {
+        // Error toast handled by caller; keep modal open for correction
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -927,6 +1020,8 @@ export const AddDeviceModal: React.FC<Readonly<AddDeviceModalProps>> = ({
               device={newDevice}
               isDiagnosticRunning={isDiagnosticRunning}
               diagnosticCompleted={diagnosticCompleted}
+              diagnosticResult={diagnosticResult}
+              diagnosticError={diagnosticError}
               onRunTest={runDiagnosticTest}
               slideDirection={slideDirection}
             />
@@ -972,10 +1067,20 @@ export const AddDeviceModal: React.FC<Readonly<AddDeviceModalProps>> = ({
               <button
                 type="button"
                 onClick={handleNextOrSave}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-sky-500 dark:hover:bg-sky-600 shadow-lg shadow-blue-500/25 transition-all cursor-pointer active:scale-[0.98]"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-sky-500 dark:hover:bg-sky-600 shadow-lg shadow-blue-500/25 transition-all cursor-pointer active:scale-[0.98] disabled:opacity-60"
               >
-                <span>Complete Onboarding</span>
-                <ShieldCheck className="w-4 h-4 stroke-[2.2]" />
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Onboarding...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Complete Onboarding</span>
+                    <ShieldCheck className="w-4 h-4 stroke-[2.2]" />
+                  </>
+                )}
               </button>
             )}
           </div>

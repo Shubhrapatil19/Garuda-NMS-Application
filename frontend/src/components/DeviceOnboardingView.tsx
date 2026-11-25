@@ -12,31 +12,24 @@ import {
   X,
   LayoutGrid,
   List,
+  Loader2,
+  AlertOctagon,
+  RotateCw,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import OverviewCards from "./OverviewCards";
-import dbData from "../../data/db.json";
 import onboardingData from "../data/onboardingDefaults.json";
 import AddDeviceModal, { NewDeviceData } from "./AddDeviceModal";
 import ImportCsvModal from "./ImportCsvModal";
+import DeviceDetailModal from "./DeviceDetailModal";
+import {
+  deviceService,
+  NetworkDevice,
+  parsePollingFrequencySeconds,
+} from "@/services/deviceService";
 
-export interface NetworkDevice {
-  id: string;
-  name: string;
-  hostname: string;
-  ip: string;
-  port: number;
-  vendor: string;
-  model: string;
-  type: string;
-  site: string;
-  status: "online" | "warning" | "offline" | "maintenance";
-  protocol: string;
-  uptime: string;
-  latency: string;
-  lastSeen: string;
-  serialNumber: string;
-}
+export type { NetworkDevice };
 
 interface DeviceOnboardingViewProps {
   onBackToDashboard?: () => void;
@@ -45,13 +38,18 @@ interface DeviceOnboardingViewProps {
 
 interface DeviceActionProps {
   testingPingId: string | null;
+  deletingId: string | null;
   onPingTest: (device: NetworkDevice) => void;
   onDeleteDevice: (id: string, name: string) => void;
+  onSelectDevice: (device: NetworkDevice) => void;
 }
 
 interface DeviceListProps extends DeviceActionProps {
   filteredDevices: NetworkDevice[];
   totalDevicesCount: number;
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
 }
 
 const getStatusBadge = (status: NetworkDevice["status"]) => {
@@ -82,9 +80,14 @@ const getStatusBadge = (status: NetworkDevice["status"]) => {
 const DeviceTableView: React.FC<DeviceListProps> = ({
   filteredDevices,
   totalDevicesCount,
+  isLoading,
+  error,
+  onRetry,
   testingPingId,
+  deletingId,
   onPingTest,
   onDeleteDevice,
+  onSelectDevice,
 }) => {
   return (
     <div>
@@ -103,7 +106,40 @@ const DeviceTableView: React.FC<DeviceListProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-[#14233a]">
-            {filteredDevices.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-2.5">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                      Fetching network device inventory...
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 flex items-center justify-center">
+                      <AlertOctagon className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Unable to Load Device Inventory
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-md">{error}</p>
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      className="mt-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                      <span>Retry</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ) : filteredDevices.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                   <Server className="w-8 h-8 mx-auto mb-2 opacity-40 text-slate-400" />
@@ -118,6 +154,7 @@ const DeviceTableView: React.FC<DeviceListProps> = ({
             ) : (
               filteredDevices.map((device) => {
                 const isTesting = testingPingId === device.id;
+                const isDeleting = deletingId === device.id;
                 const { badgeClass, dotClass } = getStatusBadge(device.status);
 
                 return (
@@ -131,9 +168,14 @@ const DeviceTableView: React.FC<DeviceListProps> = ({
                           <Server className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="min-w-0">
-                          <span className="font-bold text-slate-900 dark:text-white block truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => onSelectDevice(device)}
+                            className="font-bold text-slate-900 dark:text-white block truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-left cursor-pointer"
+                            title="View & edit device profile"
+                          >
                             {device.name}
-                          </span>
+                          </button>
                           <span className="text-[11px] text-slate-400 font-mono block truncate">
                             {device.hostname}
                           </span>
@@ -205,11 +247,25 @@ const DeviceTableView: React.FC<DeviceListProps> = ({
 
                         <button
                           type="button"
+                          onClick={() => onSelectDevice(device)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-500/10 transition-colors cursor-pointer"
+                          title="View / Edit device parameters"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => onDeleteDevice(device.id, device.name)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          disabled={isDeleting}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors cursor-pointer disabled:opacity-50"
                           title="Decommission device"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {isDeleting ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -231,17 +287,72 @@ const DeviceTableView: React.FC<DeviceListProps> = ({
   );
 };
 
-const DeviceGridView: React.FC<DeviceActionProps & { filteredDevices: NetworkDevice[] }> = ({
+const DeviceGridView: React.FC<
+  DeviceActionProps & {
+    filteredDevices: NetworkDevice[];
+    isLoading: boolean;
+    error: string | null;
+    onRetry: () => void;
+  }
+> = ({
   filteredDevices,
+  isLoading,
+  error,
+  onRetry,
   testingPingId,
+  deletingId,
   onPingTest,
   onDeleteDevice,
+  onSelectDevice,
 }) => {
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center bg-slate-50/50 dark:bg-[#050b14]/50">
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto mb-2" />
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+          Fetching network device inventory...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center bg-slate-50/50 dark:bg-[#050b14]/50 flex flex-col items-center gap-2">
+        <AlertOctagon className="w-6 h-6 text-rose-500" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Unable to Load Device Inventory
+        </p>
+        <p className="text-xs text-slate-400 max-w-md">{error}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+          <span>Retry</span>
+        </button>
+      </div>
+    );
+  }
+
+  if (filteredDevices.length === 0) {
+    return (
+      <div className="p-12 text-center bg-slate-50/50 dark:bg-[#050b14]/50 text-slate-400">
+        <Server className="w-8 h-8 mx-auto mb-2 opacity-40" />
+        <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+          No devices match your search or filter
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-5 sm:p-6 bg-slate-50/50 dark:bg-[#050b14]/50">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDevices.map((device) => {
           const isTesting = testingPingId === device.id;
+          const isDeleting = deletingId === device.id;
           const { badgeClass } = getStatusBadge(device.status);
 
           return (
@@ -256,10 +367,14 @@ const DeviceGridView: React.FC<DeviceActionProps & { filteredDevices: NetworkDev
                       <Server className="w-5 h-5 text-slate-700 dark:text-slate-300" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                      <button
+                        type="button"
+                        onClick={() => onSelectDevice(device)}
+                        className="font-bold text-slate-900 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
+                      >
                         {device.name}
-                      </h4>
-                      <span className="text-xs text-slate-400 font-mono">
+                      </button>
+                      <span className="text-xs text-slate-400 font-mono block">
                         {device.ip}:{device.port}
                       </span>
                     </div>
@@ -309,16 +424,29 @@ const DeviceGridView: React.FC<DeviceActionProps & { filteredDevices: NetworkDev
                     type="button"
                     onClick={() => onPingTest(device)}
                     disabled={isTesting}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
                   >
                     {isTesting ? "Testing..." : "Test Ping"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => onDeleteDevice(device.id, device.name)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors"
+                    onClick={() => onSelectDevice(device)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-500/10 transition-colors cursor-pointer"
+                    title="View / Edit device parameters"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteDevice(device.id, device.name)}
+                    disabled={isDeleting}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -335,11 +463,10 @@ const emptySubscribe = () => () => {};
 export const DeviceOnboardingView: React.FC<DeviceOnboardingViewProps> = ({
   className = "",
 }) => {
-  const [devices, setDevices] = useState<NetworkDevice[]>(() => {
-    return (
-      (dbData as unknown as { devices?: NetworkDevice[] }).devices || []
-    );
-  });
+  const [devices, setDevices] = useState<NetworkDevice[]>([]);
+  const [summaryDevices, setSummaryDevices] = useState<NetworkDevice[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -355,6 +482,46 @@ export const DeviceOnboardingView: React.FC<DeviceOnboardingViewProps> = ({
   const [isImportModalVisible, setIsImportModalVisible] = useState(false);
 
   const [testingPingId, setTestingPingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
+  const fetchDevices = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await deviceService.getDevices({
+        search: searchQuery,
+        oem: vendorFilter,
+        type: typeFilter,
+        status: statusFilter,
+      });
+      setDevices(data);
+      if (
+        !searchQuery.trim() &&
+        statusFilter === "all" &&
+        vendorFilter === "all" &&
+        typeFilter === "all"
+      ) {
+        setSummaryDevices(data);
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Unable to retrieve device inventory from the server.";
+      setError(msg);
+      setDevices([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, vendorFilter, typeFilter, statusFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchDevices();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchDevices]);
 
   const openAddDeviceModal = () => {
     setIsAddModalRendered(true);
@@ -431,56 +598,85 @@ export const DeviceOnboardingView: React.FC<DeviceOnboardingViewProps> = ({
   }, [devices, searchQuery, statusFilter, vendorFilter, typeFilter]);
 
   const metrics = useMemo(() => {
-    const total = devices.length;
-    const online = devices.filter((d) => d.status === "online").length;
-    const warning = devices.filter((d) => d.status === "warning").length;
-    const offline = devices.filter((d) => d.status === "offline").length;
-    const maintenance = devices.filter((d) => d.status === "maintenance").length;
+    const source = summaryDevices.length > 0 ? summaryDevices : devices;
+    const total = source.length;
+    const online = source.filter((d) => d.status === "online").length;
+    const warning = source.filter((d) => d.status === "warning").length;
+    const offline = source.filter((d) => d.status === "offline").length;
+    const maintenance = source.filter((d) => d.status === "maintenance").length;
     return { total, online, warning, offline, maintenance };
-  }, [devices]);
+  }, [summaryDevices, devices]);
 
-  const handleSaveAndProvision = (newDevice: NewDeviceData) => {
-    const created: NetworkDevice = {
-      id: `dev-${Date.now().toString().slice(-4)}`,
-      name: newDevice.name.trim(),
-      hostname: `${newDevice.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.garuda.io`,
-      ip: newDevice.ip.trim(),
-      port: Number.parseInt(newDevice.port) || 161,
-      vendor: newDevice.vendor,
-      model: newDevice.model.trim() || "Gen-3 Enterprise",
-      type: newDevice.type,
-      site: newDevice.site,
-      status: "online",
-      protocol: newDevice.protocol,
-      uptime: "100.0%",
-      latency: `${Math.floor(8 + Math.random() * 16)} ms`,
-      lastSeen: "Just now",
-      serialNumber:
-        newDevice.serialNumber.trim() ||
-        `GAR-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-    };
+  const handleSaveAndProvision = async (newDevice: NewDeviceData) => {
+    try {
+      const created = await deviceService.createDevice({
+        name: newDevice.name.trim(),
+        hostname: `${newDevice.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}.garuda.io`,
+        ip: newDevice.ip.trim(),
+        oem: newDevice.vendor,
+        type: newDevice.type,
+        location: newDevice.site,
+        environment: "Production",
+        mgmtIp: newDevice.ip.trim(),
+        port: Number.parseInt(newDevice.port, 10) || 161,
+        protocol: newDevice.protocol || "SSH / SNMP",
+        username: newDevice.snmpUser || "admin",
+        authMethod: `${newDevice.authProto || "SHA-256"} + ${newDevice.privProto || "AES-128"}`,
+        credential: newDevice.authKey || newDevice.readCommunity || "encrypted_secret",
+        collectionMethod: newDevice.snmpCapable ? "SNMP" : "REST API",
+        snmpVersion: newDevice.snmpVersion || "v2c",
+        snmpCommunity: newDevice.readCommunity || "public_garuda_ro",
+        pollingFrequency: parsePollingFrequencySeconds(
+          newDevice.pollingFrequency || newDevice.pollingInterval
+        ),
+      });
 
-    setDevices((prev) => [created, ...prev]);
-    closeAddModal();
-    toast.success("Device Onboarded Successfully", {
-      description: `${created.name} (${created.ip}) registered in ${created.site}.`,
-    });
+      setDevices((prev) => [created, ...prev]);
+      setSummaryDevices((prev) => [created, ...prev]);
+      closeAddModal();
+      toast.success("Device Onboarded Successfully", {
+        description: `${created.name} (${created.ip}) registered in ${created.site}.`,
+      });
+      await fetchDevices();
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to onboard network device.";
+      toast.error("Onboarding Failed", { description: msg });
+      throw err;
+    }
   };
 
-  const handlePingTest = (device: NetworkDevice) => {
+  const handlePingTest = async (device: NetworkDevice) => {
     setTestingPingId(device.id);
-    setTimeout(() => {
-      setTestingPingId(null);
-      if (device.status === "offline") {
-        toast.error("ICMP Ping Timeout", {
-          description: `No response from ${device.ip} (Destination unreachable).`,
+    try {
+      const result = await deviceService.testConnection({
+        ip: device.ip,
+        port: device.port || 161,
+        protocol: device.protocol || "SSH / SNMP",
+        oem: device.vendor || "Cisco",
+      });
+
+      if (result.success) {
+        setDevices((prev) =>
+          prev.map((d) =>
+            d.id === device.id ? { ...d, latency: result.rtt, lastSeen: "Just now" } : d
+          )
+        );
+        toast.success("Ping Response Confirmed", {
+          description: `${result.message} Echo reply from ${device.ip} in ${result.rtt}.`,
         });
       } else {
-        toast.success("Ping Response Confirmed", {
-          description: `Echo reply from ${device.ip} in ${device.latency || "14ms"} (0% packet loss).`,
+        toast.error("ICMP Ping Timeout", {
+          description: result.message || `No response from ${device.ip} (Destination unreachable).`,
         });
       }
-    }, 600);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : `Failed to probe ${device.ip}.`;
+      toast.error("Connectivity Test Failed", { description: msg });
+    } finally {
+      setTestingPingId(null);
+    }
   };
 
   const handleExportCSV = () => {
@@ -536,11 +732,28 @@ export const DeviceOnboardingView: React.FC<DeviceOnboardingViewProps> = ({
     });
   };
 
-  const handleDeleteDevice = (id: string, name: string) => {
-    setDevices((prev) => prev.filter((d) => d.id !== id));
-    toast.info("Device Decommissioned", {
-      description: `${name} has been removed from inventory.`,
-    });
+  const handleDeleteDevice = async (id: string, name: string) => {
+    setDeletingId(id);
+    try {
+      await deviceService.deleteDevice(id);
+      setDevices((prev) => prev.filter((d) => d.id !== id));
+      setSummaryDevices((prev) => prev.filter((d) => d.id !== id));
+      toast.info("Device Decommissioned", {
+        description: `${name} has been removed from inventory.`,
+      });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : `Failed to decommission ${name}.`;
+      toast.error("Decommission Failed", { description: msg });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeviceUpdated = (updated: NetworkDevice) => {
+    setDevices((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    setSummaryDevices((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    fetchDevices();
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -739,16 +952,26 @@ export const DeviceOnboardingView: React.FC<DeviceOnboardingViewProps> = ({
           <DeviceTableView
             filteredDevices={filteredDevices}
             totalDevicesCount={devices.length}
+            isLoading={isLoading}
+            error={error}
+            onRetry={fetchDevices}
             testingPingId={testingPingId}
+            deletingId={deletingId}
             onPingTest={handlePingTest}
             onDeleteDevice={handleDeleteDevice}
+            onSelectDevice={(device) => setSelectedDeviceId(device.id)}
           />
         ) : (
           <DeviceGridView
             filteredDevices={filteredDevices}
+            isLoading={isLoading}
+            error={error}
+            onRetry={fetchDevices}
             testingPingId={testingPingId}
+            deletingId={deletingId}
             onPingTest={handlePingTest}
             onDeleteDevice={handleDeleteDevice}
+            onSelectDevice={(device) => setSelectedDeviceId(device.id)}
           />
         )}
       </div>
@@ -768,6 +991,12 @@ export const DeviceOnboardingView: React.FC<DeviceOnboardingViewProps> = ({
         onClose={closeImportModal}
         onFileUpload={handleFileUpload}
         onDownloadTemplate={handleExportCSV}
+      />
+
+      <DeviceDetailModal
+        deviceId={selectedDeviceId}
+        onClose={() => setSelectedDeviceId(null)}
+        onUpdated={handleDeviceUpdated}
       />
     </div>
   );
